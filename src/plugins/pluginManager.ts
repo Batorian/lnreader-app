@@ -130,7 +130,7 @@ const fetchPlugins = (): Promise<PluginItem[]> => {
   // plugins host
   const githubUsername = 'Batorian';
   const githubRepository = 'lnreader-plugins';
-  const pluginsTag = 'v2.1.0';
+  const pluginsTag = 'v2.0.0';
   return fetch(
     `https://raw.githubusercontent.com/${githubUsername}/${githubRepository}/plugins/${pluginsTag}/.dist/plugins.min.json`,
   ).then(res => res.json());
