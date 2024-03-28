@@ -128,8 +128,8 @@ const updatePlugin = async (plugin: PluginItem) => {
 
 const fetchPlugins = (): Promise<PluginItem[]> => {
   // plugins host
-  const githubUsername = 'LNReader';
-  const githubRepository = 'lnreader-sources';
+  const githubUsername = 'Batorian';
+  const githubRepository = 'lnreader-plugins';
   const pluginsTag = 'v2.1.0';
   return fetch(
     `https://raw.githubusercontent.com/${githubUsername}/${githubRepository}/plugins/${pluginsTag}/.dist/plugins.min.json`,
