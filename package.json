@@ -17,6 +17,7 @@
   "dependencies": {
     "@cd-z/react-native-epub-creator": "^2.0.4",
     "@gorhom/bottom-sheet": "^4.4.5",
+    "@postlight/parser": "^2.2.3",
     "@react-native-community/slider": "^4.4.2",
     "@react-native-cookies/cookies": "^6.2.1",
     "@react-native-google-signin/google-signin": "^11.0.0",
@@ -66,6 +67,7 @@
     "react-native-webview": "^13.10.5",
     "react-native-zip-archive": "^7.0.0",
     "sanitize-html": "^2.13.0",
+    "url": "^0.11.4",
     "urlencode": "^2.0.0"
   },
   "devDependencies": {

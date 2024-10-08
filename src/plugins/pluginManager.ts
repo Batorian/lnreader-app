@@ -18,6 +18,7 @@ import FileManager from '@native/FileManager';
 import { getRepositoriesFromDb } from '@database/queries/RepositoryQueries';
 import { showToast } from '@utils/showToast';
 import { PLUGIN_STORAGE } from '@utils/Storages';
+import { parse } from '@postlight/parser';
 
 const packages: Record<string, any> = {
   'htmlparser2': { Parser },
@@ -30,6 +31,7 @@ const packages: Record<string, any> = {
   '@libs/isAbsoluteUrl': { isUrlAbsolute },
   '@libs/filterInputs': { FilterTypes },
   '@libs/defaultCover': { defaultCover },
+  '@postlight/parser': { parse },
 };
 
 const initPlugin = (pluginId: string, rawCode: string) => {
