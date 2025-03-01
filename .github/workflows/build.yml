@@ -2,7 +2,9 @@ name: Build
 on:
   push:
     branches:
+      - master
       - dev
+  workflow_dispatch:
 jobs:
   build-android:
     name: Build App
@@ -91,9 +93,9 @@ jobs:
           COMMIT_COUNT: ${{ env.COMMIT_COUNT }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
         run: |
-          sed -i 's/LNReader/LNReader-r${{ env.COMMIT_COUNT }}(${{ env.COMMIT_ID }})/g' android/app/src/main/res/values/strings.xml
-          cd android && ./gradlew assembleRelease --no-daemon -PcustomAppId=com.rajarsheechatterjee.LNReader.commit_${{ env.COMMIT_ID }}
-          mv app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/LNReader-r${{ env.COMMIT_COUNT }}\(${{ env.COMMIT_ID }}\)-customID.apk
+          sed -i 's/LNReaderDev/LNReaderDev-r${{ env.COMMIT_COUNT }}(${{ env.COMMIT_ID }})/g' android/app/src/main/res/values/strings.xml
+          cd android && ./gradlew assembleRelease --no-daemon -PcustomAppId=com.rajarsheechatterjee.LNReaderDev.commit_${{ env.COMMIT_ID }}
+          mv app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/LNReaderDev-r${{ env.COMMIT_COUNT }}\(${{ env.COMMIT_ID }}\)-customID.apk
 
       - name: Upload Custom APK
         env:
