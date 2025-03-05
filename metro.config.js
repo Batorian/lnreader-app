@@ -14,7 +14,42 @@ const map = {
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
 };
+
 const customConfig = {
+  resolver: {
+    extraNodeModules: {
+      'linkedom': path.resolve(__dirname, './react-native-linkedom.js'),
+      'cross-fetch': path.resolve(__dirname, './react-native-cross-fetch.js'),
+    },
+    resolveRequest: (context, moduleName, platform) => {
+      // Handle linkedom imports
+      if (
+        moduleName === 'linkedom' ||
+        (moduleName.includes('@extractus/article-extractor/src/utils') &&
+          moduleName.includes('linkedom'))
+      ) {
+        return {
+          filePath: path.resolve(__dirname, './react-native-linkedom.js'),
+          type: 'sourceFile',
+        };
+      }
+
+      // Handle cross-fetch imports
+      if (
+        moduleName === 'cross-fetch' ||
+        (moduleName.includes('@extractus/article-extractor/src/utils') &&
+          moduleName.includes('cross-fetch'))
+      ) {
+        return {
+          filePath: path.resolve(__dirname, './react-native-cross-fetch.js'),
+          type: 'sourceFile',
+        };
+      }
+
+      // Fall back to the standard resolution for everything else
+      return context.resolveRequest(context, moduleName, platform);
+    },
+  },
   server: {
     port: 8081,
     enhanceMiddleware: (metroMiddleware, metroServer) => {
@@ -41,4 +76,5 @@ const customConfig = {
     },
   },
 };
+
 module.exports = mergeConfig(defaultConfig, customConfig);
