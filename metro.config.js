@@ -20,8 +20,26 @@ const customConfig = {
     extraNodeModules: {
       'linkedom': path.resolve(__dirname, './react-native-linkedom.js'),
       'cross-fetch': path.resolve(__dirname, './react-native-cross-fetch.js'),
+      '@extractus/article-extractor': path.resolve(
+        __dirname,
+        './react-native-article-extractor.js',
+      ),
     },
     resolveRequest: (context, moduleName, platform) => {
+      // Handle article-extractor imports
+      if (
+        moduleName === '@extractus/article-extractor' ||
+        moduleName.includes('@extractus/article-extractor')
+      ) {
+        return {
+          filePath: path.resolve(
+            __dirname,
+            './react-native-article-extractor.js',
+          ),
+          type: 'sourceFile',
+        };
+      }
+
       // Handle linkedom imports
       if (
         moduleName === 'linkedom' ||
