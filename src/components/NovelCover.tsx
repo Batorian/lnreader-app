@@ -5,16 +5,16 @@ import {
   Text,
   useWindowDimensions,
   Pressable,
+  Image,
 } from 'react-native';
 
 import { LinearGradient } from 'expo-linear-gradient';
-import { Image } from 'react-native';
 import ListView from './ListView';
 
 import { useDeviceOrientation } from '@hooks';
 import { coverPlaceholderColor } from '../theme/colors';
 import { DisplayModes } from '@screens/library/constants/constants';
-import { LibraryNovelInfo } from '@database/types';
+import { DBNovelInfo, NovelInfo } from '@database/types';
 import { NovelItem } from '@plugins/types';
 import { ThemeColors } from '@theme/types';
 import { useLibrarySettings } from '@hooks/persisted';
@@ -22,6 +22,7 @@ import { getUserAgent } from '@hooks/persisted/useUserAgent';
 import { getString } from '@strings/translations';
 import SourceScreenSkeletonLoading from '@screens/browse/loadingAnimation/SourceScreenSkeletonLoading';
 import { defaultCover } from '@plugins/helpers/constants';
+import { ActivityIndicator } from 'react-native-paper';
 
 interface UnreadBadgeProps {
   chaptersDownloaded: number;
@@ -37,8 +38,13 @@ interface DownloadBadgeProps {
   theme: ThemeColors;
 }
 
+type CoverItemDB =
+  | DBNovelInfo & {
+      completeRow?: number;
+    };
+
 type CoverItemLibrary =
-  | LibraryNovelInfo & {
+  | NovelInfo & {
       completeRow?: number;
     };
 
@@ -54,18 +60,30 @@ interface INovelCover<TNovel> {
   theme: ThemeColors;
   isSelected: boolean;
   addSkeletonLoading?: boolean;
+  inActivity?: boolean;
   onLongPress: (item: TNovel) => void;
   selectedNovelIds: number[];
+  globalSearch?: boolean;
 }
 
-function NovelCover<TNovel extends CoverItemLibrary | CoverItemPlugin>({
+function isFromDB(
+  item: CoverItemLibrary | CoverItemPlugin | CoverItemDB,
+): item is CoverItemDB {
+  return 'chaptersDownloaded' in item;
+}
+
+function NovelCover<
+  TNovel extends CoverItemLibrary | CoverItemPlugin | CoverItemDB,
+>({
   item,
   onPress,
   libraryStatus,
   theme,
   isSelected,
   addSkeletonLoading,
+  inActivity,
   onLongPress,
+  globalSearch,
   selectedNovelIds,
 }: INovelCover<TNovel>) {
   const {
@@ -84,10 +102,19 @@ function NovelCover<TNovel extends CoverItemLibrary | CoverItemPlugin>({
     [orientation, novelsPerRow],
   );
 
-  const coverHeight = useMemo(
-    () => (window.width / numColumns) * (4 / 3),
-    [window.width, numColumns],
-  );
+  const coverHeight = useMemo(() => {
+    if (globalSearch) {
+      return ((window.width / 3 - 16) * 4) / 3;
+    }
+    return (window.width / numColumns) * (4 / 3);
+  }, [globalSearch, window.width, numColumns]);
+
+  const coverWidth = useMemo(() => {
+    if (globalSearch) {
+      return window.width / 3 - 16;
+    }
+    return undefined;
+  }, [globalSearch, window.width]);
 
   const selectNovel = () => onLongPress(item);
 
@@ -103,11 +130,17 @@ function NovelCover<TNovel extends CoverItemLibrary | CoverItemPlugin>({
       />
     );
   }
-  return displayMode !== DisplayModes.List ? (
+
+  const flex = globalSearch ? 1 : 1 / numColumns;
+  const margin = globalSearch ? 0 : 2;
+
+  return displayMode !== DisplayModes.List || globalSearch ? (
     <View
       style={[
         {
-          flex: 1 / numColumns,
+          flex,
+          width: coverWidth,
+          margin,
         },
         styles.standardNovelCover,
         isSelected && {
@@ -128,7 +161,7 @@ function NovelCover<TNovel extends CoverItemLibrary | CoverItemPlugin>({
       >
         <View style={styles.badgeContainer}>
           {libraryStatus ? <InLibraryBadge theme={theme} /> : null}
-          {item.id ? (
+          {isFromDB(item) ? (
             <>
               {showDownloadBadges && item.chaptersDownloaded > 0 ? (
                 <DownloadBadge
@@ -148,6 +181,7 @@ function NovelCover<TNovel extends CoverItemLibrary | CoverItemPlugin>({
               ) : null}
             </>
           ) : null}
+          {inActivity ? <InActivityBadge theme={theme} /> : null}
         </View>
         <Image
           source={{ uri, headers: { 'User-Agent': getUserAgent() } }}
@@ -166,7 +200,11 @@ function NovelCover<TNovel extends CoverItemLibrary | CoverItemPlugin>({
           ) : null}
         </View>
         {displayMode === DisplayModes.Comfortable ? (
-          <ComfortableTitle novelName={item.name} theme={theme} />
+          <ComfortableTitle
+            novelName={item.name}
+            theme={theme}
+            width={coverWidth}
+          />
         ) : null}
       </Pressable>
     </View>
@@ -174,7 +212,7 @@ function NovelCover<TNovel extends CoverItemLibrary | CoverItemPlugin>({
     <ListView
       item={item}
       downloadBadge={
-        showDownloadBadges && item.id && item.chaptersDownloaded ? (
+        showDownloadBadges && isFromDB(item) && item.chaptersDownloaded ? (
           <DownloadBadge
             theme={theme}
             showUnreadBadges={showUnreadBadges}
@@ -184,7 +222,7 @@ function NovelCover<TNovel extends CoverItemLibrary | CoverItemPlugin>({
         ) : null
       }
       unreadBadge={
-        showUnreadBadges && item.id && item.chaptersUnread ? (
+        showUnreadBadges && isFromDB(item) && item.chaptersUnread ? (
           <UnreadBadge
             theme={theme}
             chaptersDownloaded={item.chaptersDownloaded}
@@ -209,9 +247,11 @@ export default memo(NovelCover);
 const ComfortableTitle = ({
   theme,
   novelName,
+  width,
 }: {
   theme: ThemeColors;
   novelName: string;
+  width?: number;
 }) => (
   <Text
     numberOfLines={2}
@@ -220,6 +260,7 @@ const ComfortableTitle = ({
       styles.padding4,
       {
         color: theme.onSurface,
+        maxWidth: width,
       },
     ]}
   >
@@ -253,6 +294,20 @@ const InLibraryBadge = ({ theme }: { theme: ThemeColors }) => (
   >
     {getString('novelScreen.inLibaray')}
   </Text>
+);
+
+const InActivityBadge = ({ theme }: { theme: ThemeColors }) => (
+  <View
+    style={[
+      styles.activityBadge,
+      {
+        backgroundColor: theme.primary,
+      },
+      styles.standardBorderRadius,
+    ]}
+  >
+    <ActivityIndicator animating={true} size={10} color={theme.onPrimary} />
+  </View>
 );
 
 interface BadgeProps {
@@ -311,93 +366,96 @@ const DownloadBadge: React.FC<DownloadBadgeProps> = ({
 
 const styles = StyleSheet.create({
   LeftBorderRadius: {
-    borderTopLeftRadius: 4,
     borderBottomLeftRadius: 4,
+    borderTopLeftRadius: 4,
   },
   RightBorderRadius: {
-    borderTopRightRadius: 4,
     borderBottomRightRadius: 4,
-  },
-  standardBorderRadius: {
-    borderRadius: 4,
-  },
-  opacityPoint5: { opacity: 0.5 },
-  padding4: { padding: 4 },
-  titleContainer: {
-    flex: 1,
-    borderRadius: 4,
-  },
-  title: {
-    fontFamily: 'pt-sans-bold',
-    fontSize: 14,
-    padding: 8,
-  },
-  linearGradient: {
-    borderRadius: 4,
-  },
-  opac: {
-    padding: 4.8,
-    borderRadius: 4,
-    flex: 1,
-  },
-  extensionIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 4,
-  },
-  listView: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 4,
-  },
-
-  downloadBadge: {
-    borderTopLeftRadius: 4,
-    borderBottomLeftRadius: 4,
-    paddingTop: 2,
-    paddingHorizontal: 5,
-    fontSize: 12,
-  },
-  unreadBadge: {
     borderTopRightRadius: 4,
-    borderBottomRightRadius: 4,
-    paddingTop: 2,
-    paddingHorizontal: 4,
-    fontSize: 12,
   },
-  inLibraryBadge: {
-    paddingVertical: 2,
-    paddingHorizontal: 4,
-    fontSize: 12,
-  },
-  compactTitleContainer: {
-    position: 'absolute',
-    bottom: 4,
-    left: 4,
-    right: 4,
+  activityBadge: {
+    marginHorizontal: 4,
+    padding: 5,
   },
   badgeContainer: {
-    position: 'absolute',
-    zIndex: 1,
-    top: 10,
-    left: 10,
     flexDirection: 'row',
-  },
-  standardNovelCover: {
-    borderRadius: 6,
-    overflow: 'hidden',
-    margin: 2,
-  },
-  selectedNovelCover: {
-    opacity: 0.8,
+    left: 10,
+    position: 'absolute',
+    top: 10,
+    zIndex: 1,
   },
   compactTitle: {
     color: 'rgba(255,255,255,1)',
     textShadowColor: 'rgba(0, 0, 0, 0.75)',
     textShadowOffset: { width: -1, height: 1 },
     textShadowRadius: 10,
+  },
+  compactTitleContainer: {
+    bottom: 4,
+    left: 4,
+    position: 'absolute',
+    right: 4,
+  },
+  downloadBadge: {
+    borderBottomLeftRadius: 4,
+    borderTopLeftRadius: 4,
+    fontSize: 12,
+    paddingHorizontal: 5,
+    paddingTop: 2,
+  },
+  extensionIcon: {
+    borderRadius: 4,
+    height: 42,
+    width: 42,
+  },
+  inLibraryBadge: {
+    fontSize: 12,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  linearGradient: {
+    borderRadius: 4,
+  },
+  listView: {
+    alignItems: 'center',
+    borderRadius: 4,
+    flex: 1,
+    flexDirection: 'row',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+
+  opac: {
+    borderRadius: 4,
+    flex: 1,
+    padding: 4.8,
+  },
+  opacityPoint5: { opacity: 0.5 },
+  padding4: { padding: 4 },
+  selectedNovelCover: {
+    opacity: 0.8,
+  },
+  standardBorderRadius: {
+    borderRadius: 4,
+  },
+  standardNovelCover: {
+    borderRadius: 6,
+    overflow: 'hidden',
+  },
+  title: {
+    fontFamily: 'pt-sans-bold',
+    fontSize: 14,
+    padding: 8,
+  },
+  titleContainer: {
+    borderRadius: 4,
+    flex: 1,
+  },
+  unreadBadge: {
+    borderBottomRightRadius: 4,
+    borderTopRightRadius: 4,
+    fontSize: 12,
+    paddingHorizontal: 4,
+    paddingTop: 2,
   },
 });

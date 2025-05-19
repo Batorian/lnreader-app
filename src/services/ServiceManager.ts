@@ -14,6 +14,17 @@ import {
 } from './backup/selfhost';
 import { migrateNovel, MigrateNovelData } from './migrate/migrateNovel';
 import { downloadChapter } from './download/downloadChapter';
+import { askForPostNotificationsPermission } from '@utils/askForPostNoftificationsPermission';
+
+type taskNames =
+  | 'IMPORT_EPUB'
+  | 'UPDATE_LIBRARY'
+  | 'DRIVE_BACKUP'
+  | 'DRIVE_RESTORE'
+  | 'SELF_HOST_BACKUP'
+  | 'SELF_HOST_RESTORE'
+  | 'MIGRATE_NOVEL'
+  | 'DOWNLOAD_CHAPTER';
 
 export type BackgroundTask =
   | {
@@ -51,21 +62,35 @@ export type BackgroundTaskMetadata = {
 export type QueuedBackgroundTask = {
   task: BackgroundTask;
   meta: BackgroundTaskMetadata;
+  id: string;
 };
+
+function makeId() {
+  return (
+    Math.random().toString(36).substring(2, 15) +
+    Math.random().toString(36).substring(2, 15)
+  );
+}
 
 export default class ServiceManager {
   STORE_KEY = 'APP_SERVICE';
+  lastNotifUpdate = 0;
+  currentPendingUpdate = 0;
   private static instance?: ServiceManager;
+
   private constructor() {}
+
   static get manager() {
     if (!this.instance) {
       this.instance = new ServiceManager();
     }
     return this.instance;
   }
+
   get isRunning() {
     return BackgroundService.isRunning();
   }
+
   isMultiplicableTask(task: BackgroundTask) {
     return (
       ['DOWNLOAD_CHAPTER', 'IMPORT_EPUB', 'MIGRATE_NOVEL'] as Array<
@@ -73,9 +98,12 @@ export default class ServiceManager {
       >
     ).includes(task.name);
   }
-  start() {
+
+  async start() {
     if (!this.isRunning) {
-      BackgroundService.start(ServiceManager.lauch, {
+      const notificationsAllowed = await askForPostNotificationsPermission();
+      if (!notificationsAllowed) return;
+      BackgroundService.start(ServiceManager.launch, {
         taskName: 'app_services',
         taskTitle: 'App Service',
         taskDesc: getString('common.preparing'),
@@ -94,39 +122,103 @@ export default class ServiceManager {
       });
     }
   }
+
   setMeta(
     transformer: (meta: BackgroundTaskMetadata) => BackgroundTaskMetadata,
   ) {
-    let taskList = [...this.getTaskList()];
+    const taskList = [...this.getTaskList()];
     taskList[0] = {
       ...taskList[0],
       meta: transformer(taskList[0].meta),
     };
 
-    if (taskList[0].meta.isRunning) {
-      BackgroundService.updateNotification({
-        taskTitle: taskList[0].meta.name,
-        taskDesc: taskList[0].meta.progressText ?? '',
-        progressBar: {
-          indeterminate: taskList[0].meta.progress === undefined,
-          value: (taskList[0].meta.progress || 0) * 100,
-          max: 100,
-        },
-      });
+    if (
+      taskList[0].meta.isRunning &&
+      taskList[0].task.name !== 'DOWNLOAD_CHAPTER'
+    ) {
+      const now = Date.now();
+      if (now - this.lastNotifUpdate > 1000) {
+        const delay = 1000 - now - this.lastNotifUpdate;
+        const id = ++this.currentPendingUpdate;
+        setTimeout(() => {
+          if (this.currentPendingUpdate !== id) {
+            return;
+          }
+          BackgroundService.updateNotification({
+            taskTitle: taskList[0].meta.name,
+            taskDesc: taskList[0].meta.progressText ?? '',
+            progressBar: {
+              indeterminate: taskList[0].meta.progress === undefined,
+              value: (taskList[0].meta.progress || 0) * 100,
+              max: 100,
+            },
+          });
+        }, delay);
+      } else {
+        this.lastNotifUpdate = now;
+        BackgroundService.updateNotification({
+          taskTitle: taskList[0].meta.name,
+          taskDesc: taskList[0].meta.progressText ?? '',
+          progressBar: {
+            indeterminate: taskList[0].meta.progress === undefined,
+            value: (taskList[0].meta.progress || 0) * 100,
+            max: 100,
+          },
+        });
+      }
     }
 
     setMMKVObject(this.STORE_KEY, taskList);
   }
-  async executeTask(task: QueuedBackgroundTask) {
+
+  //gets the progress bar for download chapters notification
+  getProgressForNotification(
+    currentTask: QueuedBackgroundTask,
+    startingTasks: QueuedBackgroundTask[],
+  ) {
+    let i = null;
+    let count = 0;
+    for (const task of startingTasks) {
+      if (
+        task.task.name === 'DOWNLOAD_CHAPTER' &&
+        task.meta.name === currentTask.meta.name
+      ) {
+        if (task.id === currentTask.id) {
+          i = count;
+        }
+        count++;
+      } else {
+        if (i !== null) {
+          break;
+        }
+        count = 0;
+      }
+    }
+    if (i === null) {
+      return null;
+    }
+    return (i / count) * 100;
+  }
+
+  async executeTask(
+    task: QueuedBackgroundTask,
+    startingTasks: QueuedBackgroundTask[],
+  ) {
+    const progress =
+      task.task.name === 'DOWNLOAD_CHAPTER'
+        ? this.getProgressForNotification(task, startingTasks)
+        : null;
     await BackgroundService.updateNotification({
       taskTitle: task.meta.name,
       taskDesc: task.meta.progressText ?? '',
       progressBar: {
-        indeterminate: true,
+        indeterminate: progress === null,
         max: 100,
-        value: 0,
+        value: progress == null ? 0 : progress,
       },
     });
+    this.lastNotifUpdate = Date.now();
+    this.currentPendingUpdate = 0;
 
     switch (task.task.name) {
       case 'IMPORT_EPUB':
@@ -145,12 +237,10 @@ export default class ServiceManager {
         return migrateNovel(task.task.data, this.setMeta.bind(this));
       case 'DOWNLOAD_CHAPTER':
         return downloadChapter(task.task.data, this.setMeta.bind(this));
-      default:
-        return;
     }
   }
 
-  static async lauch() {
+  static async launch() {
     // retrieve class instance because this is running in different context
     const manager = ServiceManager.manager;
     const doneTasks: Record<BackgroundTask['name'], number> = {
@@ -163,13 +253,22 @@ export default class ServiceManager {
       'MIGRATE_NOVEL': 0,
       'DOWNLOAD_CHAPTER': 0,
     };
+    const startingTasks = manager.getTaskList();
+    const tasksSet = new Set(startingTasks.map(t => t.id));
     while (BackgroundService.isRunning()) {
-      const currentTask = manager.getTaskList()[0];
+      const currentTasks = manager.getTaskList();
+      const currentTask = currentTasks[0];
       if (!currentTask) {
         break;
       }
+
+      //Add any newly queued tasks to the starting tasks list
+      const newtasks = currentTasks.filter(t => !tasksSet.has(t.id));
+      startingTasks.push(...newtasks);
+      newtasks.forEach(t => tasksSet.add(t.id));
+
       try {
-        await manager.executeTask(currentTask);
+        await manager.executeTask(currentTask, startingTasks);
         doneTasks[currentTask.task.name] += 1;
       } catch (error: any) {
         await Notifications.scheduleNotificationAsync({
@@ -190,19 +289,23 @@ export default class ServiceManager {
           title: 'Background tasks done',
           body: Object.keys(doneTasks)
             .filter(key => doneTasks[key as BackgroundTask['name']] > 0)
-            .map(key => `${key}: ${doneTasks[key as BackgroundTask['name']]}`)
+            .map(
+              key =>
+                `${getString(`notifications.${key as taskNames}`)}: ${
+                  doneTasks[key as BackgroundTask['name']]
+                }`,
+            )
             .join('\n'),
         },
         trigger: null,
       });
     }
   }
+
   getTaskName(task: BackgroundTask) {
     switch (task.name) {
       case 'DOWNLOAD_CHAPTER':
-        return (
-          'Download ' + task.data.novelName + ' - ' + task.data.chapterName
-        );
+        return 'Download ' + task.data.novelName;
       case 'IMPORT_EPUB':
         return 'Import Epub ' + task.data.filename;
       case 'MIGRATE_NOVEL':
@@ -224,31 +327,41 @@ export default class ServiceManager {
         return 'Unknown Task';
     }
   }
+
   getTaskList() {
     return getMMKVObject<Array<QueuedBackgroundTask>>(this.STORE_KEY) || [];
   }
+
   addTask(tasks: BackgroundTask | BackgroundTask[]) {
-    const currentTasks = this.getTaskList();
+    let currentTasks = this.getTaskList();
+    // @ts-expect-error Older version can still have tasks with old format
+    currentTasks = currentTasks.filter(task => !task?.name);
+
     const addableTasks = (Array.isArray(tasks) ? tasks : [tasks]).filter(
       task =>
         this.isMultiplicableTask(task) ||
         !currentTasks.some(_t => _t.task.name === task.name),
     );
     if (addableTasks.length) {
-      let newTasks: QueuedBackgroundTask[] = addableTasks.map(task => ({
+      const newTasks: QueuedBackgroundTask[] = addableTasks.map(task => ({
         task,
         meta: {
           name: this.getTaskName(task),
           isRunning: false,
           progress: undefined,
-          progressText: undefined,
+          progressText:
+            task.name === 'DOWNLOAD_CHAPTER'
+              ? task.data.chapterName
+              : undefined,
         },
+        id: makeId(),
       }));
 
       setMMKVObject(this.STORE_KEY, currentTasks.concat(newTasks));
       this.start();
     }
   }
+
   removeTasksByName(name: BackgroundTask['name']) {
     const taskList = this.getTaskList();
     if (taskList[0]?.task?.name === name) {
@@ -265,15 +378,19 @@ export default class ServiceManager {
       );
     }
   }
+
   clearTaskList() {
     setMMKVObject(this.STORE_KEY, []);
   }
+
   pause() {
     BackgroundService.stop();
   }
+
   resume() {
     this.start();
   }
+
   stop() {
     BackgroundService.stop();
     this.clearTaskList();

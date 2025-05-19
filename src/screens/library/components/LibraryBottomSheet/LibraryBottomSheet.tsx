@@ -1,6 +1,18 @@
-import React, { Ref, useMemo, useState } from 'react';
-import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import { SceneMap, TabBar, TabView } from 'react-native-tab-view';
+import React, { RefObject, useCallback, useMemo, useState } from 'react';
+import {
+  StyleProp,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+  ViewStyle,
+} from 'react-native';
+import {
+  SceneMap,
+  TabBar,
+  TabDescriptor,
+  TabView,
+} from 'react-native-tab-view';
 import color from 'color';
 
 import { useLibrarySettings, useTheme } from '@hooks/persisted';
@@ -14,14 +26,16 @@ import {
   LibrarySortOrder,
   librarySortOrderList,
 } from '@screens/library/constants/constants';
-import { FlashList } from '@shopify/flash-list';
 import { RadioButton } from '@components/RadioButton/RadioButton';
 import { overlay } from 'react-native-paper';
-import { BottomSheetView, BottomSheetModal } from '@gorhom/bottom-sheet';
+import { BottomSheetView } from '@gorhom/bottom-sheet';
 import BottomSheet from '@components/BottomSheet/BottomSheet';
+import { BottomSheetModalMethods } from '@gorhom/bottom-sheet/lib/typescript/types';
+import { FlashList } from '@shopify/flash-list';
 
 interface LibraryBottomSheetProps {
-  bottomSheetRef: Ref<BottomSheetModal> | null;
+  bottomSheetRef: RefObject<BottomSheetModalMethods | null>;
+  style?: StyleProp<ViewStyle>;
 }
 
 const FirstRoute = () => {
@@ -33,7 +47,7 @@ const FirstRoute = () => {
   } = useLibrarySettings();
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={styles.flex}>
       <FlashList
         estimatedItemSize={4}
         extraData={[filter]}
@@ -64,7 +78,7 @@ const SecondRoute = () => {
     useLibrarySettings();
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={styles.flex}>
       <FlashList
         data={librarySortOrderList}
         extraData={[sortOrder]}
@@ -103,7 +117,7 @@ const ThirdRoute = () => {
   } = useLibrarySettings();
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={styles.flex}>
       <Text style={[styles.sectionHeader, { color: theme.onSurfaceVariant }]}>
         {getString('libraryScreen.bottomSheet.display.badges')}
       </Text>
@@ -159,6 +173,7 @@ const ThirdRoute = () => {
 
 const LibraryBottomSheet: React.FC<LibraryBottomSheetProps> = ({
   bottomSheetRef,
+  style,
 }) => {
   const theme = useTheme();
 
@@ -176,10 +191,8 @@ const LibraryBottomSheet: React.FC<LibraryBottomSheetProps> = ({
             .string(),
         },
         styles.tabBar,
+        style,
       ]}
-      renderLabel={({ route, color }) => (
-        <Text style={{ color }}>{route.title}</Text>
-      )}
       inactiveColor={theme.onSurfaceVariant}
       activeColor={theme.primary}
       pressColor={color(theme.primary).alpha(0.12).string()}
@@ -202,6 +215,22 @@ const LibraryBottomSheet: React.FC<LibraryBottomSheetProps> = ({
     third: ThirdRoute,
   });
 
+  const renderCommonOptions = useCallback(
+    ({ route, color: col }: { route: any; color: string }) => (
+      <Text style={{ color: col }}>{route.title}</Text>
+    ),
+    [],
+  );
+
+  const commonOptions: TabDescriptor<{
+    key: string;
+    title: string;
+  }> = useMemo(() => {
+    return {
+      label: renderCommonOptions,
+    };
+  }, [renderCommonOptions]);
+
   return (
     <BottomSheet bottomSheetRef={bottomSheetRef} snapPoints={[520]}>
       <BottomSheetView
@@ -211,6 +240,7 @@ const LibraryBottomSheet: React.FC<LibraryBottomSheetProps> = ({
         ]}
       >
         <TabView
+          commonOptions={commonOptions}
           navigationState={{ index, routes }}
           renderTabBar={renderTabBar}
           renderScene={renderScene}
@@ -227,13 +257,9 @@ export default LibraryBottomSheet;
 
 const styles = StyleSheet.create({
   bottomSheetCtn: {
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
     flex: 1,
-    borderTopRightRadius: 8,
-    borderTopLeftRadius: 8,
-  },
-  tabView: {
-    borderTopRightRadius: 8,
-    borderTopLeftRadius: 8,
   },
   sectionHeader: {
     padding: 16,
@@ -243,4 +269,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     elevation: 0,
   },
+  tabView: {
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+  },
+  flex: { flex: 1 },
 });

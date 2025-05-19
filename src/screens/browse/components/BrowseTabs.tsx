@@ -10,14 +10,8 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { useBrowseSettings, usePlugins } from '@hooks/persisted';
 import { PluginItem } from '@plugins/types';
-import {
-  FlashList,
-  ListRenderItem as FlashListRenderItem,
-  ListRenderItemInfo,
-} from '@shopify/flash-list';
 import { coverPlaceholderColor } from '@theme/colors';
 import { ThemeColors } from '@theme/types';
-import { Swipeable } from 'react-native-gesture-handler';
 import { getString } from '@strings/translations';
 import { BrowseScreenProps, MoreStackScreenProps } from '@navigators/types';
 import { Button, EmptyView, IconButtonV2 } from '@components';
@@ -32,7 +26,9 @@ import { Portal } from 'react-native-paper';
 import SourceSettingsModal from './Modals/SourceSettings';
 import { useBoolean } from '@hooks';
 import { getPlugin } from '@plugins/pluginManager';
-
+import { getLocaleLanguageName } from '@utils/constants/languages';
+import Swipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
+import { FlashList, ListRenderItem } from '@shopify/flash-list';
 interface AvailableTabProps {
   searchText: string;
   theme: ThemeColors;
@@ -57,7 +53,9 @@ export const InstalledTab = memo(
     const settingsModal = useBoolean();
     const [selectedPluginId, setSelectedPluginId] = useState<string>('');
 
-    const pluginSettings = getPlugin(selectedPluginId)?.pluginSettings;
+    const pluginSettings = selectedPluginId
+      ? getPlugin(selectedPluginId)?.pluginSettings
+      : undefined;
 
     const navigateToSource = useCallback(
       (plugin: PluginItem, showLatestNovels?: boolean) => {
@@ -69,7 +67,7 @@ export const InstalledTab = memo(
         });
         setLastUsedPlugin(plugin);
       },
-      [],
+      [navigation, setLastUsedPlugin],
     );
 
     const searchedPlugins = useMemo(() => {
@@ -88,13 +86,13 @@ export const InstalledTab = memo(
       }
     }, [searchText, filteredInstalledPlugins]);
 
-    const renderItem: FlashListRenderItem<PluginItem> = useCallback(
+    const renderItem: ListRenderItem<PluginItem> = useCallback(
       ({ item }) => {
         return (
           <Swipeable
             dragOffsetFromLeftEdge={30}
             dragOffsetFromRightEdge={30}
-            renderLeftActions={(progress, dragX, ref) => {
+            renderLeftActions={(_progress, _dragX, ref) => {
               return (
                 <View
                   style={[
@@ -119,7 +117,7 @@ export const InstalledTab = memo(
                 </View>
               );
             }}
-            renderRightActions={(progress, dragX, ref) => (
+            renderRightActions={(_progress, _dragX, ref) => (
               <View
                 style={[styles.buttonGroup, { backgroundColor: theme.error }]}
               >
@@ -147,7 +145,7 @@ export const InstalledTab = memo(
               android_ripple={{ color: theme.rippleColor }}
               onPress={() => navigateToSource(item)}
             >
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={[styles.center, styles.row]}>
                 <Image
                   source={{ uri: item.iconUrl }}
                   style={[styles.icon, { backgroundColor: theme.surface }]}
@@ -167,7 +165,7 @@ export const InstalledTab = memo(
                   </Text>
                 </View>
               </View>
-              <View style={{ flex: 1 }} />
+              <View style={styles.flex} />
               {item.hasSettings ? (
                 <IconButtonV2
                   name="cog-outline"
@@ -206,7 +204,14 @@ export const InstalledTab = memo(
           </Swipeable>
         );
       },
-      [theme, searchedPlugins],
+      [
+        theme,
+        navigation,
+        uninstallPlugin,
+        navigateToSource,
+        settingsModal,
+        updatePlugin,
+      ],
     );
 
     return (
@@ -255,7 +260,9 @@ export const InstalledTab = memo(
                 {renderItem({
                   item: lastUsedPlugin,
                   index: 0,
-                } as ListRenderItemInfo<PluginItem>)}
+                  target: 'Cell',
+                  extraData: [theme],
+                })}
               </>
             ) : null}
             <Text
@@ -307,7 +314,7 @@ const AvailablePluginCard = ({
     <View>
       {plugin.header ? (
         <Text style={[styles.listHeader, { color: theme.onSurfaceVariant }]}>
-          {plugin.lang}
+          {getLocaleLanguageName(plugin.lang)}
         </Text>
       ) : null}
       <Animated.View
@@ -317,7 +324,7 @@ const AvailablePluginCard = ({
           viewStyles,
         ]}
       >
-        <Animated.View style={{ flexDirection: 'row' }}>
+        <Animated.View style={styles.row}>
           <Animated.Image
             source={{ uri: plugin.iconUrl }}
             style={[
@@ -347,7 +354,7 @@ const AvailablePluginCard = ({
                 textStyles,
               ]}
             >
-              {`${plugin.lang} - ${plugin.version}`}
+              {`${getLocaleLanguageName(plugin.lang)} - ${plugin.version}`}
             </Animated.Text>
           </Animated.View>
         </Animated.View>
@@ -394,20 +401,18 @@ export const AvailableTab = memo(({ searchText, theme }: AvailableTabProps) => {
           plg.id.includes(lowerCaseSearchText),
       );
     }
-    let previousLang: string | null = null;
+
     return res
       .sort((a, b) => a.lang.localeCompare(b.lang))
-      .map(plg => {
-        if (plg.lang !== previousLang) {
-          previousLang = plg.lang;
-          return { ...plg, header: true };
-        } else {
-          return { ...plg, header: false };
-        }
+      .map((plg, i) => {
+        return {
+          ...plg,
+          header: i === 0 ? true : plg.lang !== res[i - 1].lang,
+        };
       });
   }, [searchText, filteredAvailablePlugins]);
 
-  const renderItem: FlashListRenderItem<PluginItem & { header: boolean }> =
+  const renderItem: ListRenderItem<PluginItem & { header: boolean }> =
     useCallback(
       ({ item }) => {
         return (
@@ -418,7 +423,7 @@ export const AvailableTab = memo(({ searchText, theme }: AvailableTabProps) => {
           />
         );
       },
-      [theme, searchedPlugins],
+      [theme, installPlugin],
     );
 
   return (
@@ -447,7 +452,7 @@ export const AvailableTab = memo(({ searchText, theme }: AvailableTabProps) => {
       }
       ListEmptyComponent={
         !filteredAvailablePlugins.length ? (
-          <View style={{ marginTop: 100 }}>
+          <View style={styles.margintTop100}>
             <EmptyView
               icon="(･Д･。"
               description=" No repositories yet. Add your first plugin repository to get
@@ -469,7 +474,7 @@ export const AvailableTab = memo(({ searchText, theme }: AvailableTabProps) => {
             />
           </View>
         ) : (
-          <View style={{ marginTop: 100 }}>
+          <View style={styles.margintTop100}>
             <EmptyView
               icon="(･Д･。"
               description="No plugins available for this search term"
@@ -483,39 +488,45 @@ export const AvailableTab = memo(({ searchText, theme }: AvailableTabProps) => {
 });
 
 const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
+  margintTop100: { marginTop: 100 },
+  addition: {
+    fontSize: 12,
+    lineHeight: 20,
+  },
+  buttonGroup: {
     alignItems: 'center',
+    flexDirection: 'row',
+    paddingHorizontal: 8,
+  },
+  container: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    justifyContent: 'space-between',
-  },
-  listHeader: {
-    fontSize: 14,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    fontWeight: '600',
-  },
-  icon: {
-    height: 40,
-    width: 40,
-    borderRadius: 4,
-    backgroundColor: coverPlaceholderColor,
   },
   details: {
     marginLeft: 16,
   },
-  addition: {
-    fontSize: 12,
-    lineHeight: 20,
+  icon: {
+    backgroundColor: coverPlaceholderColor,
+    borderRadius: 4,
+    height: 40,
+    width: 40,
+  },
+  listHeader: {
+    fontSize: 14,
+    fontWeight: '600',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   name: {
     fontWeight: 'bold',
     lineHeight: 20,
   },
-  buttonGroup: {
+  row: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
   },
+  center: { alignItems: 'center' },
+  flex: { flex: 1 },
 });

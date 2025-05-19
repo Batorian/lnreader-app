@@ -29,6 +29,10 @@ export interface StringMap {
   'advancedSettingsScreen.novelInsertFailed': 'string';
   'advancedSettingsScreen.useFAB': 'string';
   'advancedSettingsScreen.userAgent': 'string';
+  'advancedSettingsScreen.recreateDBIndexes': 'string';
+  'advancedSettingsScreen.recreateDBIndexesToast': 'string';
+  'advancedSettingsScreen.recreateDBIndexesDialogTitle': 'string';
+  'advancedSettingsScreen.recreateDBIndexesDesc': 'string';
   'appearance': 'string';
   'appearanceScreen.accentColor': 'string';
   'appearanceScreen.alwaysShowNavLabels': 'string';
@@ -56,6 +60,7 @@ export interface StringMap {
   'backupScreen.createBackupWarning': 'string';
   'backupScreen.downloadingData': 'string';
   'backupScreen.downloadingDownloadedFiles': 'string';
+  'backupScreen.failed': 'string';
   'backupScreen.drive.backup': 'string';
   'backupScreen.drive.backupInterruped': 'string';
   'backupScreen.drive.googleDriveBackup': 'string';
@@ -111,6 +116,7 @@ export interface StringMap {
   'browseScreen.settings.description': 'string';
   'browseSettings': 'string';
   'browseSettingsScreen.concurrentSearches': 'string';
+  'browseSettingsScreen.multi': 'string';
   'browseSettingsScreen.languages': 'string';
   'categories.addCategories': 'string';
   'categories.cantDeleteDefault': 'string';
@@ -167,6 +173,8 @@ export interface StringMap {
   'common.signOut': 'string';
   'common.sort': 'string';
   'common.submit': 'string';
+  'common.loading': 'string';
+  'common.warning': 'string';
   'webview.refresh': 'string';
   'webview.share': 'string';
   'webview.openInBrowser': 'string';
@@ -284,6 +292,8 @@ export interface StringMap {
   'novelScreen.convertToEpubModal.useCustomJS': 'string';
   'novelScreen.convertToEpubModal.useCustomJSWarning': 'string';
   'novelScreen.convertToEpubModal.useReaderTheme': 'string';
+  'novelScreen.coverSaved': 'string';
+  'novelScreen.coverNotSaved': 'string';
   'novelScreen.deleteChapterError': 'string';
   'novelScreen.deleteMessage': 'string';
   'novelScreen.deletedAllDownloads': 'string';
@@ -310,6 +320,7 @@ export interface StringMap {
   'novelScreen.jumpToChapterModal.openChapter': 'string';
   'novelScreen.migrate': 'string';
   'novelScreen.noSummary': 'string';
+  'novelScreen.noCoverFound': 'string';
   'novelScreen.progress': 'string';
   'novelScreen.readChaptersDeleted': 'string';
   'novelScreen.startReadingChapters': 'string';
@@ -404,4 +415,12 @@ export interface StringMap {
   'onboardingScreen.light': 'string';
   'onboardingScreen.dark': 'string';
   'onboardingScreen.complete': 'string';
+  'notifications.IMPORT_EPUB': 'string';
+  'notifications.UPDATE_LIBRARY': 'string';
+  'notifications.DRIVE_BACKUP': 'string';
+  'notifications.DRIVE_RESTORE': 'string';
+  'notifications.SELF_HOST_BACKUP': 'string';
+  'notifications.SELF_HOST_RESTORE': 'string';
+  'notifications.MIGRATE_NOVEL': 'string';
+  'notifications.DOWNLOAD_CHAPTER': 'string';
 }

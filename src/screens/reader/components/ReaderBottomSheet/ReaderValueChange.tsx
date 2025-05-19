@@ -5,9 +5,12 @@ import { useChapterReaderSettings, useTheme } from '@hooks/persisted';
 import { IconButtonV2 } from '@components';
 import { ChapterReaderSettings } from '@hooks/persisted/useSettings';
 
-type ValueKey<T extends object> = {
-  [K in keyof T]: T[K] extends number ? K : never;
-}[keyof T];
+type ValueKey<T extends object> = Exclude<
+  {
+    [K in keyof T]: T[K] extends number ? K : never;
+  }[keyof T],
+  undefined
+>;
 
 interface ReaderValueChangeProps {
   labelStyle?: TextStyle | TextStyle[];
@@ -74,20 +77,20 @@ const ReaderValueChange: React.FC<ReaderValueChangeProps> = ({
 export default ReaderValueChange;
 
 const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
+  buttonContainer: {
     alignItems: 'center',
+    flexDirection: 'row',
+  },
+  container: {
+    alignItems: 'center',
+    flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
     marginVertical: 6,
+    paddingHorizontal: 16,
   },
   value: {
-    width: 60,
     paddingHorizontal: 4,
     textAlign: 'center',
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    width: 60,
   },
 });

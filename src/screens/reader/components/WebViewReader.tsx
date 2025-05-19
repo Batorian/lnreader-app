@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { memo, useEffect, useMemo } from 'react';
 import { NativeEventEmitter, NativeModules, StatusBar } from 'react-native';
 import WebView from 'react-native-webview';
 import color from 'color';
@@ -30,19 +30,17 @@ type WebViewPostEvent = {
 type WebViewReaderProps = {
   html: string;
   nextChapter?: ChapterInfo;
-  webViewRef: React.RefObject<WebView>;
+  webViewRef: React.RefObject<WebView | null>;
   saveProgress(percentage: number): void;
   onPress(): void;
   navigateChapter(position: 'NEXT' | 'PREV'): void;
 };
 
 const onLogMessage = (payload: { nativeEvent: { data: string } }) => {
-  let dataPayload;
-  try {
-    dataPayload = JSON.parse(payload.nativeEvent.data);
-  } catch (e) {}
+  const dataPayload = JSON.parse(payload.nativeEvent.data);
   if (dataPayload) {
     if (dataPayload.type === 'console') {
+      /* eslint-disable no-console */
       console.info(`[Console] ${JSON.stringify(dataPayload.msg, null, 2)}`);
     }
   }
@@ -77,7 +75,7 @@ const WebViewReader: React.FC<WebViewReaderProps> = ({
       initialChapterGeneralSettings,
     [],
   );
-  const batteryLevel = useMemo(getBatteryLevelSync, []);
+  const batteryLevel = useMemo(() => getBatteryLevelSync(), []);
   const plugin = getPlugin(novel?.pluginId);
   const pluginCustomJS = `file://${PLUGIN_STORAGE}/${plugin?.id}/custom.js`;
   const pluginCustomCSS = `file://${PLUGIN_STORAGE}/${plugin?.id}/custom.css`;
@@ -257,4 +255,4 @@ const WebViewReader: React.FC<WebViewReaderProps> = ({
   );
 };
 
-export default WebViewReader;
+export default memo(WebViewReader);

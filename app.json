@@ -4,7 +4,16 @@
     "slug": "LNReader",
     "scheme": "lnreader",
     "plugins": [
-      "expo-localization"
+      "expo-localization",
+      "react-native-edge-to-edge",
+      [
+        "expo-sqlite",
+        {
+          "enableFTS": false,
+          "useSQLCipher": false
+        }
+      ],
+      "expo-web-browser"
     ]
   }
 }

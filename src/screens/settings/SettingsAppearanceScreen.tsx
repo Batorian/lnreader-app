@@ -11,7 +11,7 @@ import {
   useMMKVObject,
   useMMKVString,
 } from 'react-native-mmkv';
-import { Appbar, List } from '@components';
+import { Appbar, List, SafeAreaView } from '@components';
 import { AppearanceSettingsScreenProps } from '@navigators/types';
 import { getString } from '@strings/translations';
 import { darkThemes, lightThemes } from '@theme/md3';
@@ -40,7 +40,7 @@ const AppearanceSettings = ({ navigation }: AppearanceSettingsScreenProps) => {
   const hideAccentColorModal = () => setAccentColorModal(false);
 
   return (
-    <>
+    <SafeAreaView excludeTop>
       <Appbar
         title={getString('appearance')}
         handleGoBack={navigation.goBack}
@@ -74,6 +74,7 @@ const AppearanceSettings = ({ navigation }: AppearanceSettingsScreenProps) => {
           >
             {lightThemes.map(item => (
               <ThemePicker
+                horizontal
                 key={item.id}
                 currentTheme={theme}
                 theme={item}
@@ -104,6 +105,7 @@ const AppearanceSettings = ({ navigation }: AppearanceSettingsScreenProps) => {
           >
             {darkThemes.map(item => (
               <ThemePicker
+                horizontal
                 key={item.id}
                 currentTheme={theme}
                 theme={item}
@@ -184,7 +186,7 @@ const AppearanceSettings = ({ navigation }: AppearanceSettingsScreenProps) => {
         theme={theme}
         showAccentColors={true}
       />
-    </>
+    </SafeAreaView>
   );
 };
 

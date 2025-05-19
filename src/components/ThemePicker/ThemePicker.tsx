@@ -2,25 +2,29 @@ import React from 'react';
 import { View, Text, /* StyleSheet, */ Pressable } from 'react-native';
 import { overlay } from 'react-native-paper';
 import color from 'color';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import MaterialCommunityIcons from '@react-native-vector-icons/material-design-icons';
 import { ThemeColors } from '@theme/types';
 
 interface ThemePickerProps {
   theme: ThemeColors;
   currentTheme: ThemeColors;
   onPress: () => void;
+  horizontal?: boolean;
 }
 
 export const ThemePicker = ({
   theme,
   currentTheme,
   onPress,
+  horizontal = false,
 }: ThemePickerProps) => (
   <View
     style={{
       justifyContent: 'center',
       alignItems: 'center',
-      marginRight: 16,
+      paddingBottom: 8,
+      width: horizontal ? 'auto' : '33%',
+      marginHorizontal: horizontal ? 4 : 'auto',
     }}
   >
     <View
@@ -35,7 +39,7 @@ export const ThemePicker = ({
         height: 140,
         borderRadius: 16,
         overflow: 'hidden',
-        elevation: 1,
+        boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.2)',
       }}
     >
       <Pressable style={{ flex: 1 }} onPress={onPress}>
@@ -49,7 +53,6 @@ export const ThemePicker = ({
               position: 'absolute',
               top: 5,
               right: 5,
-              elevation: 2,
               borderRadius: 50,
               padding: 1.6,
               zIndex: 1,
@@ -60,7 +63,7 @@ export const ThemePicker = ({
           style={{
             height: 20,
             backgroundColor: overlay(2, theme.surface),
-            elevation: 1,
+            boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
             justifyContent: 'center',
           }}
         >

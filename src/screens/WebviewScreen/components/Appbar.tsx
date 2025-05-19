@@ -11,7 +11,7 @@ interface AppbarProps {
   theme: ThemeColors;
   canGoBack: boolean;
   canGoForward: boolean;
-  webView: RefObject<WebView>;
+  webView: RefObject<WebView | null>;
   setMenuVisible: (value: boolean) => void;
   goBack: () => void;
 }
@@ -83,20 +83,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
   },
+  iconContainer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  title: {
+    fontSize: 18,
+    paddingBottom: 2,
+    paddingLeft: 2,
+  },
   titleContainer: {
     flex: 1,
     justifyContent: 'center',
   },
-  title: {
-    paddingBottom: 2,
-    paddingLeft: 2,
-    fontSize: 18,
-  },
   url: {
     fontSize: 16,
-  },
-  iconContainer: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
   },
 });

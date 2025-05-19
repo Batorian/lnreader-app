@@ -1,7 +1,7 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 
 import { FAB } from 'react-native-paper';
-import { Container, ErrorScreenV2, SearchbarV2 } from '@components/index';
+import { ErrorScreenV2, SafeAreaView, SearchbarV2 } from '@components/index';
 import NovelList from '@components/NovelList';
 import NovelCover from '@components/NovelCover';
 import { BottomSheetModal } from '@gorhom/bottom-sheet';
@@ -14,12 +14,11 @@ import { useBrowseSource, useSearchSource } from './useBrowseSource';
 import { NovelItem } from '@plugins/types';
 import { getString } from '@strings/translations';
 import { StyleSheet } from 'react-native';
-import { useLibraryNovels } from '@screens/library/hooks/useLibrary';
-import { switchNovelToLibrary } from '@database/queries/NovelQueries';
-import { LibraryNovelInfo, NovelInfo } from '@database/types';
+import { NovelInfo } from '@database/types';
 import SourceScreenSkeletonLoading from '@screens/browse/loadingAnimation/SourceScreenSkeletonLoading';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrowseSourceScreenProps } from '@navigators/types';
+import { useLibraryContext } from '@components/Context/LibraryContext';
 
 const BrowseSourceScreen = ({ route, navigation }: BrowseSourceScreenProps) => {
   const theme = useTheme();
@@ -67,26 +66,25 @@ const BrowseSourceScreen = ({ route, navigation }: BrowseSourceScreenProps) => {
     });
   };
 
-  const { library, setLibrary } = useLibraryNovels();
-
-  const novelInLibrary = (novelPath: string) =>
-    library?.some(
-      novel => novel.pluginId === pluginId && novel.path === novelPath,
-    );
+  const { novelInLibrary, switchNovelToLibrary } = useLibraryContext();
+  const [inActivity, setInActivity] = useState<Record<string, boolean>>({});
 
   const navigateToNovel = useCallback(
-    (item: NovelItem | LibraryNovelInfo) =>
-      navigation.navigate('Novel', {
-        ...item,
-        pluginId: pluginId,
+    (item: NovelItem | NovelInfo) =>
+      navigation.navigate('ReaderStack', {
+        screen: 'Novel',
+        params: {
+          ...item,
+          pluginId: pluginId,
+        },
       }),
-    [pluginId],
+    [navigation, pluginId],
   );
 
-  const { bottom } = useSafeAreaInsets();
+  const { bottom, right } = useSafeAreaInsets();
   const filterSheetRef = useRef<BottomSheetModal | null>(null);
   return (
-    <Container>
+    <SafeAreaView>
       <SearchbarV2
         searchText={searchText}
         leftIcon="magnify"
@@ -122,13 +120,14 @@ const BrowseSourceScreen = ({ route, navigation }: BrowseSourceScreenProps) => {
           data={novelList}
           inSource
           renderItem={({ item }) => {
-            const inLibrary = novelInLibrary(item.path);
+            const inLibrary = novelInLibrary(pluginId, item.path);
 
             return (
               <NovelCover
                 item={item}
                 theme={theme}
                 libraryStatus={inLibrary}
+                inActivity={inActivity[item.path]}
                 onPress={() => navigateToNovel(item)}
                 isSelected={false}
                 addSkeletonLoading={
@@ -136,24 +135,11 @@ const BrowseSourceScreen = ({ route, navigation }: BrowseSourceScreenProps) => {
                   (hasNextSearchPage && Boolean(searchText))
                 }
                 onLongPress={async () => {
+                  setInActivity(prev => ({ ...prev, [item.path]: true }));
+
                   await switchNovelToLibrary(item.path, pluginId);
-                  setLibrary(prevValues => {
-                    if (inLibrary) {
-                      return [
-                        ...prevValues.filter(novel => novel.path !== item.path),
-                      ];
-                    } else {
-                      return [
-                        ...prevValues,
-                        {
-                          ...item,
-                          pluginId: pluginId,
-                          inLibrary: true,
-                          isLocal: false,
-                        } as NovelInfo,
-                      ];
-                    }
-                  });
+
+                  setInActivity(prev => ({ ...prev, [item.path]: false }));
                 }}
                 selectedNovelIds={[]}
               />
@@ -177,7 +163,11 @@ const BrowseSourceScreen = ({ route, navigation }: BrowseSourceScreenProps) => {
             icon={'filter-variant'}
             style={[
               styles.filterFab,
-              { backgroundColor: theme.primary, marginBottom: bottom },
+              {
+                backgroundColor: theme.primary,
+                marginBottom: bottom + 16,
+                marginRight: right + 16,
+              },
             ]}
             label={getString('common.filter')}
             uppercase={false}
@@ -192,7 +182,7 @@ const BrowseSourceScreen = ({ route, navigation }: BrowseSourceScreenProps) => {
           />
         </>
       ) : null}
-    </Container>
+    </SafeAreaView>
   );
 };
 
@@ -200,9 +190,9 @@ export default BrowseSourceScreen;
 
 const styles = StyleSheet.create({
   filterFab: {
-    position: 'absolute',
+    bottom: 0,
     margin: 16,
+    position: 'absolute',
     right: 0,
-    bottom: 16,
   },
 });

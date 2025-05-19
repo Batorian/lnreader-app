@@ -2,66 +2,115 @@ import { useCallback, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 
 import { getCategoriesFromDb } from '@database/queries/CategoryQueries';
-import {
-  getLibraryWithCategory,
-  getLibraryNovelsFromDb,
-} from '@database/queries/LibraryQueries';
+import { getLibraryNovelsFromDb } from '@database/queries/LibraryQueries';
 
-import { Category, LibraryNovelInfo, NovelInfo } from '@database/types';
+import { Category, NovelInfo } from '@database/types';
 
 import { useLibrarySettings } from '@hooks/persisted';
 import { LibrarySortOrder } from '../constants/constants';
+import { switchNovelToLibraryQuery } from '@database/queries/NovelQueries';
 
-type Library = Category & { novels: LibraryNovelInfo[] };
+// type Library = Category & { novels: LibraryNovelInfo[] };
+export type ExtendedCategory = Category & { novelIds: number[] };
+export type UseLibraryReturnType = {
+  library: NovelInfo[];
+  categories: ExtendedCategory[];
+  isLoading: boolean;
+  setCategories: React.Dispatch<React.SetStateAction<ExtendedCategory[]>>;
+  refreshCategories: () => Promise<void>;
+  setLibrary: React.Dispatch<React.SetStateAction<NovelInfo[]>>;
+  novelInLibrary: (pluginId: string, novelPath: string) => boolean;
+  switchNovelToLibrary: (novelPath: string, pluginId: string) => Promise<void>;
+  refetchLibrary: () => void;
+  setLibrarySearchText: (text: string) => void;
+};
 
-export const useLibrary = ({ searchText }: { searchText?: string }) => {
+export const useLibrary = (): UseLibraryReturnType => {
   const {
     filter,
     sortOrder = LibrarySortOrder.DateAdded_DESC,
     downloadedOnlyMode = false,
   } = useLibrarySettings();
 
-  const [library, setLibrary] = useState<Library[]>([]);
+  const [library, setLibrary] = useState<NovelInfo[]>([]);
+  const [categories, setCategories] = useState<ExtendedCategory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [searchText, setSearchText] = useState('');
 
-  const getLibrary = async () => {
+  const refreshCategories = useCallback(async () => {
+    const dbCategories = getCategoriesFromDb();
+
+    const res = dbCategories.map(c => ({
+      ...c,
+      novelIds: (c.novelIds ?? '').split(',').map(Number),
+    }));
+
+    setCategories(res);
+  }, []);
+
+  const getLibrary = useCallback(async () => {
     if (searchText) {
       setIsLoading(true);
     }
 
-    const [categories, novels] = await Promise.all([
-      getCategoriesFromDb(),
-      getLibraryWithCategory({
-        searchText,
-        filter,
-        sortOrder,
-        downloadedOnlyMode,
-      }),
+    const [_, novels] = await Promise.all([
+      refreshCategories(),
+      getLibraryNovelsFromDb(sortOrder, filter, searchText, downloadedOnlyMode),
     ]);
 
-    const res = categories.map(category => ({
-      ...category,
-      novels: novels.filter(novel => novel.category === category.name),
-    }));
-
-    setLibrary(res);
+    setLibrary(novels);
     setIsLoading(false);
-  };
+  }, [downloadedOnlyMode, filter, refreshCategories, searchText, sortOrder]);
 
-  useFocusEffect(
-    useCallback(() => {
-      getLibrary();
-    }, [searchText, filter, sortOrder, downloadedOnlyMode]),
+  const novelInLibrary = useCallback(
+    (pluginId: string, novelPath: string) =>
+      library?.some(
+        novel => novel.pluginId === pluginId && novel.path === novelPath,
+      ),
+    [library],
   );
 
-  return { library, isLoading, refetchLibrary: getLibrary };
+  const switchNovelToLibrary = useCallback(
+    async (novelPath: string, pluginId: string) => {
+      await switchNovelToLibraryQuery(novelPath, pluginId);
+
+      // Important to get correct chapters count
+      // Count is set by sql trigger
+      const novels = getLibraryNovelsFromDb(
+        sortOrder,
+        filter,
+        searchText,
+        downloadedOnlyMode,
+      );
+
+      setLibrary(novels);
+    },
+    [downloadedOnlyMode, filter, searchText, sortOrder],
+  );
+
+  useFocusEffect(() => {
+    getLibrary();
+  });
+
+  return {
+    library,
+    categories,
+    isLoading,
+    setLibrary,
+    setCategories,
+    refreshCategories,
+    novelInLibrary,
+    switchNovelToLibrary,
+    refetchLibrary: getLibrary,
+    setLibrarySearchText: setSearchText,
+  };
 };
 
 export const useLibraryNovels = () => {
   const [library, setLibrary] = useState<NovelInfo[]>([]);
 
   const getLibrary = async () => {
-    const novels = await getLibraryNovelsFromDb();
+    const novels = getLibraryNovelsFromDb();
 
     setLibrary(novels);
   };
