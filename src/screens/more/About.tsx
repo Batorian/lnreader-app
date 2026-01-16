@@ -51,7 +51,7 @@ const AboutScreen = ({ navigation }: AboutScreenProps) => {
             title={getString('aboutScreen.whatsNew')}
             onPress={() =>
               Linking.openURL(
-                `https://github.com/LNReader/lnreader/releases/tag/v${version}`,
+                `https://github.com/lneader/lnreader/releases/tag/v${version}`,
               )
             }
             theme={theme}
@@ -71,17 +71,17 @@ const AboutScreen = ({ navigation }: AboutScreenProps) => {
           />
           <List.Item
             title={getString('aboutScreen.github')}
-            description="https://github.com/LNReader/lnreader"
+            description="https://github.com/lneader/lnreader"
             onPress={() =>
-              Linking.openURL('https://github.com/LNReader/lnreader')
+              Linking.openURL('https://github.com/lneader/lnreader')
             }
             theme={theme}
           />
           <List.Item
-            title={getString('aboutScreen.sources')}
-            description="https://github.com/LNReader/lnreader-sources"
+            title={getString('aboutScreen.plugins')}
+            description="https://github.com/lneader/lnreader-plugins"
             onPress={() =>
-              Linking.openURL('https://github.com/LNReader/lnreader-sources')
+              Linking.openURL('https://github.com/lneader/lnreader-plugins')
             }
             theme={theme}
           />

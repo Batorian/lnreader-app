@@ -14,15 +14,15 @@
   <a href="https://discord.gg/QdcWN4MD63">
     <img alt="Discord Chat" src="https://img.shields.io/discord/835746409357246465.svg?logo=discord&logoColor=white&logoWidth=20&labelColor=5865F2&color=4752C4&label=discord&style=flat">
   </a>
-  <a href="https://github.com/LNReader/lnreader/releases">
-    <img alt="GitHub Downloads" src="https://img.shields.io/github/downloads/LNReader/lnreader/total?label=downloads&labelColor=27303D&color=0D1117&logo=github&logoColor=FFFFFF&style=flat">
+  <a href="https://github.com/lneader/lnreader/releases">
+    <img alt="GitHub Downloads" src="https://img.shields.io/github/downloads/lneader/lnreader/total?label=downloads&labelColor=27303D&color=0D1117&logo=github&logoColor=FFFFFF&style=flat">
   </a>
 </div>
 
 <div align="center">
-  <img alt="GitHub Actions Workflow Status" src="https://img.shields.io/github/actions/workflow/status/LNReader/lnreader/build.yml?labelColor=27303D&style=flat">
-  <a href="https://github.com/LNReader/lnreader/blob/main/LICENSE">
-    <img alt="GitHub" src="https://img.shields.io/github/license/LNReader/lnreader?labelColor=27303D&color=1a73e8&style=flat">
+  <img alt="GitHub Actions Workflow Status" src="https://img.shields.io/github/actions/workflow/status/lneader/lnreader/build.yml?labelColor=27303D&style=flat">
+  <a href="https://github.com/lneader/lnreader/blob/main/LICENSE">
+    <img alt="GitHub" src="https://img.shields.io/github/license/lneader/lnreader?labelColor=27303D&color=1a73e8&style=flat">
   </a>
   <a title="Crowdin" target="_blank" href="https://crowdin.com/project/lnreader">
     <img src="https://badges.crowdin.net/lnreader/localized.svg">
@@ -32,16 +32,16 @@
 <h2 align="center">Download</h2>
 
 <p align="center">
-  <a href="https://github.com/LNReader/lnreader/releases/latest">
-    <img alt="GitHub release (latest by date)" src="https://img.shields.io/github/v/release/LNReader/lnreader?label=Stable&labelColor=0d7377&color=084c4e&style=flat">
+  <a href="https://github.com/lneader/lnreader/releases/latest">
+    <img alt="GitHub release (latest by date)" src="https://img.shields.io/github/v/release/lneader/lnreader?label=Stable&labelColor=0d7377&color=084c4e&style=flat">
   </a>
-  <a href="https://github.com/LNReader/lnreader/releases/latest">
-    <img alt="GitHub release (latest SemVer)" src="https://img.shields.io/github/v/release/LNReader/lnreader?include_prereleases&sort=semver&label=Beta&labelColor=3d3d5c&color=2a2a47&style=flat">
+  <a href="https://github.com/lneader/lnreader/releases/latest">
+    <img alt="GitHub release (latest SemVer)" src="https://img.shields.io/github/v/release/lneader/lnreader?include_prereleases&sort=semver&label=Beta&labelColor=3d3d5c&color=2a2a47&style=flat">
   </a>
 </p>
 
 <p align="center">
-  Get the app from our <a href="https://github.com/LNReader/lnreader/releases">releases page</a>.
+  Get the app from our <a href="https://github.com/lneader/lnreader/releases">releases page</a>.
 </p>
 
 <p align="center">
@@ -58,7 +58,7 @@
 
 LNReader does not have any affiliation with the content providers available.
 
-Plugin requests should be created at [lnreader-plugins](https://github.com/LNReader/lnreader-plugins).
+Plugin requests should be created at [lnreader-plugins](https://github.com/lneader/lnreader-plugins).
 
 ## Translation
 
@@ -70,4 +70,4 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md)
 
 ## License
 
-[MIT](https://github.com/LNReader/lnreader/blob/main/LICENSE)
+[MIT](https://github.com/lneader/lnreader/blob/main/LICENSE)

@@ -1,2 +1,2 @@
 export const defaultCover =
-  'https://github.com/LNReader/lnreader-plugins/blob/master/public/static/coverNotAvailable.webp?raw=true';
+  'https://github.com/lneader/lnreader-plugins/blob/master/public/static/coverNotAvailable.webp?raw=true';

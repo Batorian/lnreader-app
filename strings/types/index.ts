@@ -7,7 +7,7 @@ export interface StringMap {
   'aboutScreen.discord': 'string';
   'aboutScreen.github': 'string';
   'aboutScreen.helpTranslate': 'string';
-  'aboutScreen.sources': 'string';
+  'aboutScreen.plugins': 'string';
   'aboutScreen.version': 'string';
   'aboutScreen.whatsNew': 'string';
   'advancedSettings': 'string';
@@ -409,7 +409,6 @@ export interface StringMap {
   'readerScreen.noPreviousChapter': 'string';
   'readerSettings.autoScrollInterval': 'string';
   'readerSettings.autoScrollOffset': 'string';
-  'readerSettings.volumeButtonsOffset': 'string';
   'readerSettings.backgroundColor': 'string';
   'readerSettings.backgroundColorModal': 'string';
   'readerSettings.clearCustomCSS': 'string';
