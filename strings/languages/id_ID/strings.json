@@ -487,7 +487,7 @@
       "scrollToCurrentChapter": "Gulir ke bab saat ini",
       "scrollToTop": "Gulir ke atas"
     },
-    "emptyChapterMessage": "<p>Bab kosong.</p><p>Laporkan di <a href='https://github.com/lneader/lnreader-sources/issues/new/choose'>GitHub</a> jika tersedia di WebView.</p><p>Plugin: %{pluginId}</p><p>Novel: %{novelName}</p><p>Bab: %{chapterName}</p>",
+    "emptyChapterMessage": "<p>Bab kosong.</p><p>Laporkan di <a href='https://github.com/lnreader/lnreader-sources/issues/new/choose'>GitHub</a> jika tersedia di WebView.</p><p>Plugin: %{pluginId}</p><p>Novel: %{novelName}</p><p>Bab: %{chapterName}</p>",
     "finished": "Selesai",
     "nextChapter": "Berikutnya: %{name}",
     "noNextChapter": "Tidak ada bab berikutnya",

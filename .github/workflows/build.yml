@@ -79,7 +79,7 @@ jobs:
           COMMIT_COUNT: ${{ env.COMMIT_COUNT }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
         run: |
-          sed -i 's/lneader/lnreader-r${{ env.COMMIT_COUNT }}(${{ env.COMMIT_ID }})/g' android/app/src/main/res/values/strings.xml
+          sed -i 's/lnreader/lnreader-r${{ env.COMMIT_COUNT }}(${{ env.COMMIT_ID }})/g' android/app/src/main/res/values/strings.xml
           cd android && ./gradlew assembleRelease -PcustomAppId=com.rajarsheechatterjee.LNReader.commit_${{ env.COMMIT_ID }} --build-cache
           mv app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/LNReader-r${{ env.COMMIT_COUNT }}-${{ env.COMMIT_ID }}.apk
 
