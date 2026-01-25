@@ -4,16 +4,20 @@ import { Text, Button } from 'react-native-paper';
 import { Modal } from '@components';
 import { useTheme } from '@hooks/persisted';
 
-interface MangaUpdatesLoginDialogProps {
+interface TrackerLoginDialogProps {
   visible: boolean;
+  trackerName: string;
   onDismiss: () => void;
   onSubmit: (username: string, password: string) => Promise<void>;
+  usernameLabel?: string;
 }
 
-const MangaUpdatesLoginDialog: React.FC<MangaUpdatesLoginDialogProps> = ({
+const TrackerLoginDialog: React.FC<TrackerLoginDialogProps> = ({
   visible,
+  trackerName,
   onDismiss,
   onSubmit,
+  usernameLabel = 'Username',
 }) => {
   const theme = useTheme();
 
@@ -24,7 +28,7 @@ const MangaUpdatesLoginDialog: React.FC<MangaUpdatesLoginDialogProps> = ({
 
   const handleSubmit = async () => {
     if (!username.trim() || !password.trim()) {
-      setError('Username and password are required');
+      setError(`${usernameLabel} and password are required`);
       return;
     }
 
@@ -33,7 +37,7 @@ const MangaUpdatesLoginDialog: React.FC<MangaUpdatesLoginDialogProps> = ({
 
     try {
       await onSubmit(username.trim(), password);
-      // Clear form on success
+      /* Clear form on success */
       setUsername('');
       setPassword('');
     } catch (err) {
@@ -54,7 +58,7 @@ const MangaUpdatesLoginDialog: React.FC<MangaUpdatesLoginDialogProps> = ({
     <Modal visible={visible} onDismiss={handleCancel}>
       <View style={styles.container}>
         <Text style={[styles.title, { color: theme.onSurface }]}>
-          Login to MangaUpdates
+          Login to {trackerName}
         </Text>
 
         <TextInput
@@ -66,7 +70,7 @@ const MangaUpdatesLoginDialog: React.FC<MangaUpdatesLoginDialogProps> = ({
               borderColor: theme.outline,
             },
           ]}
-          placeholder="Username"
+          placeholder={usernameLabel}
           placeholderTextColor={theme.onSurfaceVariant}
           value={username}
           onChangeText={setUsername}
@@ -124,7 +128,7 @@ const MangaUpdatesLoginDialog: React.FC<MangaUpdatesLoginDialogProps> = ({
   );
 };
 
-export default MangaUpdatesLoginDialog;
+export default TrackerLoginDialog;
 
 const styles = StyleSheet.create({
   container: {

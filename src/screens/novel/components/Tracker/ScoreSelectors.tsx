@@ -6,6 +6,7 @@ import { RadioButton, RadioButtonGroup } from '@components/RadioButton';
 import { useTheme } from '@hooks/persisted';
 import {
   getAniListScoreFormatting,
+  getKitsuScoreFormatting,
   getMyAnimeListScoreLabel,
 } from './constants';
 import {
@@ -116,6 +117,41 @@ export const AniListScoreSelector: React.FC<AniListScoreSelectorProps> = ({
 }) => {
   const theme = useTheme();
   const formatting = getAniListScoreFormatting(scoreFormat as ScoreFormat);
+  const scores = Array.from({ length: formatting.count }, (_, i) => i);
+
+  const handleValueChange = (value: string) => {
+    onUpdateScore(Number(value));
+  };
+
+  return (
+    <ScrollView>
+      <RadioButtonGroup
+        onValueChange={handleValueChange}
+        value={trackItem.score}
+      >
+        {scores.map(score => (
+          <RadioButton
+            key={score}
+            value={score}
+            label={formatting.label(score)}
+            theme={theme}
+          />
+        ))}
+      </RadioButtonGroup>
+    </ScrollView>
+  );
+};
+
+/**
+ * Kitsu uses a 0.5-10 scale (displayed as half-increments).
+ * Score values: 0 (no score), 1 (0.5), 2 (1.0), 3 (1.5), ... 20 (10.0)
+ */
+export const KitsuScoreSelector: React.FC<ScoreSelectorProps> = ({
+  trackItem,
+  onUpdateScore,
+}) => {
+  const theme = useTheme();
+  const formatting = getKitsuScoreFormatting();
   const scores = Array.from({ length: formatting.count }, (_, i) => i);
 
   const handleValueChange = (value: string) => {

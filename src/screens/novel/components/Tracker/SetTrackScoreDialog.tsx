@@ -5,6 +5,7 @@ import { Button, DialogTitle, Modal } from '@components';
 import { getString } from '@strings/translations';
 import {
   AniListScoreSelector,
+  KitsuScoreSelector,
   MangaUpdatesScoreSelector,
   MyAnimeListScoreSelector,
 } from './ScoreSelectors';
@@ -42,6 +43,13 @@ const SetTrackScoreDialog: React.FC<TrackScoreDialogProps> = ({
       case 'MangaUpdates':
         return (
           <MangaUpdatesScoreSelector
+            trackItem={{ ...trackItem, score: selectedScore }}
+            onUpdateScore={setSelectedScore}
+          />
+        );
+      case 'Kitsu':
+        return (
+          <KitsuScoreSelector
             trackItem={{ ...trackItem, score: selectedScore }}
             onUpdateScore={setSelectedScore}
           />

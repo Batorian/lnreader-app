@@ -3,7 +3,10 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { IconButton } from 'react-native-paper';
 
 import { useTheme } from '@hooks/persisted';
-import { getAniListScoreFormatting } from './constants';
+import {
+  getAniListScoreFormatting,
+  getKitsuScoreFormatting,
+} from './constants';
 import { AddTrackingCardProps, TrackedItemCardProps } from './types';
 
 export const AddTrackingCard: React.FC<AddTrackingCardProps> = ({
@@ -60,10 +63,14 @@ export const TrackedItemCard: React.FC<TrackedItemCardProps> = ({
     }
 
     if (tracker.name === 'MangaUpdates') {
-      // Show decimal for MangaUpdates if it has decimal places
+      /* Show decimal for MangaUpdates if it has decimal places */
       return Number.isInteger(trackItem.score)
         ? trackItem.score.toString()
         : trackItem.score.toFixed(1);
+    }
+
+    if (tracker.name === 'Kitsu') {
+      return getKitsuScoreFormatting().label(trackItem.score);
     }
 
     return trackItem.score;

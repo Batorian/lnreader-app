@@ -7,6 +7,7 @@ export const TRACKER_ICONS: Record<TrackerName, ImageSourcePropType> = {
   MyAnimeList: require('../../../../../assets/mal.png'),
   MangaUpdates: require('../../../../../assets/mangaupdates.png'),
   AniList: require('../../../../../assets/anilist.png'),
+  Kitsu: require('../../../../../assets/kitsu.png'),
 };
 
 export const STATUS_LABELS: Record<UserListStatus, string> = {
@@ -90,4 +91,26 @@ export const getAniListScoreFormatting = (
         },
       };
   }
+};
+
+/**
+ * Kitsu uses a 0.5-10 scale (displayed as half-increments).
+ * Internally stored as ratingTwenty (2-20), displayed as ratingTwenty/2.
+ * This provides 21 options: 0 (no score), 0.5, 1.0, 1.5, ... 10.0
+ */
+export const getKitsuScoreFormatting = (): ScoreFormatting => {
+  return {
+    count: 21,
+    label: score => {
+      if (score === 0) {
+        return '-';
+      }
+      /* Convert index to Kitsu's half-point scale (0.5-10) */
+      const displayScore = score / 2;
+      return displayScore.toLocaleString(undefined, {
+        minimumFractionDigits: displayScore % 1 === 0 ? 0 : 1,
+        maximumFractionDigits: 1,
+      });
+    },
+  };
 };

@@ -56,6 +56,7 @@ export const useTrackedNovel = (novelId: number | 'NO_ID') => {
       'AniList',
       'MyAnimeList',
       'MangaUpdates',
+      'Kitsu',
     ];
 
     trackerNames.forEach(trackerName => {
