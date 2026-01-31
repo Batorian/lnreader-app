@@ -40,6 +40,7 @@ const Novel = ({ route, navigation }: NovelScreenProps) => {
     fetching,
     batchInformation,
     getNextChapterBatch,
+    loadUpToBatch,
     setNovel,
     bookmarkChapters,
     markChaptersRead,
@@ -321,6 +322,9 @@ const Novel = ({ route, navigation }: NovelScreenProps) => {
                 novel={novel}
                 chapterListRef={chapterListRef}
                 navigation={navigation}
+                loadUpToBatch={loadUpToBatch}
+                totalChapters={batchInformation.totalChapters}
+                chapters={chapters}
               />
               <EditInfoModal
                 modalVisible={editInfoModal}

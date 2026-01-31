@@ -16,6 +16,7 @@ import renderListChapter from './RenderListChapter';
 import { useChapterContext } from '@screens/reader/ChapterContext';
 import { useNovelContext } from '@screens/novel/NovelContext';
 import { LegendList, LegendListRef, ViewToken } from '@legendapp/list';
+import { noop } from 'lodash-es';
 
 type ButtonProperties = {
   text: string;
@@ -29,7 +30,15 @@ type ButtonsProperties = {
 
 const ChapterDrawer = () => {
   const { chapter, getChapter, setLoading } = useChapterContext();
-  const { chapters, novelSettings, pages, setPageIndex } = useNovelContext();
+  const {
+    chapters,
+    novelSettings,
+    pages,
+    fetching,
+    batchInformation,
+    getNextChapterBatch,
+    setPageIndex,
+  } = useNovelContext();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { defaultChapterSort } = useAppSettings();
@@ -89,9 +98,9 @@ const ChapterDrawer = () => {
       const newBtnLayout = Object.create(defaultButtonLayout);
 
       if (viewableItems.length === 0) return;
-      const cKey = (scrollToIndex.current ?? 0) + 2;
-      const vKey = parseInt(viewableItems[0].key, 10);
-      const visible = vKey <= cKey && cKey <= vKey + viewableItems.length - 1;
+      const visible = viewableItems
+        .map(v => v.index)
+        .includes((scrollToIndex.current ?? 0) + 2);
 
       if (!visible && scrollToIndex.current !== undefined) {
         if (
@@ -110,12 +119,7 @@ const ChapterDrawer = () => {
           };
         }
       }
-      if (cKey <= 2 && vKey <= 4) {
-        newBtnLayout.up = {
-          text: curChapter,
-          index: scrollToIndex.current,
-        };
-      }
+
       setButtonProperties(newBtnLayout);
     },
     [defaultButtonLayout, listAscending],
@@ -136,7 +140,10 @@ const ChapterDrawer = () => {
   useEffect(() => {
     const next = calculateScrollToIndex();
     if (next !== undefined) {
-      if (scrollToIndex.current === undefined) {
+      if (
+        scrollToIndex.current === undefined ||
+        next !== scrollToIndex.current
+      ) {
         scroll(next);
       }
       scrollToIndex.current = next;
@@ -154,7 +161,7 @@ const ChapterDrawer = () => {
           recycleItems
           viewabilityConfig={{
             minimumViewTime: 100,
-            viewAreaCoveragePercentThreshold: 95,
+            itemVisiblePercentThreshold: 90,
           }}
           onViewableItemsChanged={checkViewableItems}
           data={chapters}
@@ -176,6 +183,12 @@ const ChapterDrawer = () => {
           }
           estimatedItemSize={60}
           initialScrollIndex={scrollToIndex.current}
+          onEndReached={
+            batchInformation.batch < batchInformation.total && !fetching
+              ? getNextChapterBatch
+              : noop
+          }
+          onEndReachedThreshold={6}
         />
       )}
       <View style={styles.footer}>
