@@ -137,7 +137,7 @@ const ExportNovelAsEpubButton: React.FC<ExportNovelAsEpubButtonProps> = ({
       epub = new EpubBuilder(
         {
           title: novel.name,
-          fileName: novel.name.replace(/\s/g, ''),
+          fileName: novel.name.replace(/[\\/:*?"<>|\s]/g, '') || 'novel',
           language: 'en',
           cover: novel.cover,
           description: novel.summary,
