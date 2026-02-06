@@ -10,8 +10,8 @@ import {
 import { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { TextInput, Portal } from 'react-native-paper';
 import MaterialCommunityIcons from '@react-native-vector-icons/material-design-icons';
-import { StorageAccessFramework } from 'expo-file-system/legacy';
 import * as DocumentPicker from 'expo-document-picker';
+import NativeFile from '@specs/NativeFile';
 import { useTheme, useChapterReaderSettings } from '@hooks/persisted';
 import { getString } from '@strings/translations';
 import { ThemeColors } from '@theme/types';
@@ -110,9 +110,13 @@ if (title) {
       });
 
       if (file.assets) {
-        const content = await StorageAccessFramework.readAsStringAsync(
-          file.assets[0].uri,
-        );
+        const tempPath =
+          NativeFile.getConstants().ExternalCachesDirectoryPath +
+          '/imported_custom.' +
+          activeCodeTab;
+        NativeFile.copyFile(file.assets[0].uri, tempPath);
+        const content = NativeFile.readFile(tempPath);
+        NativeFile.unlink(tempPath);
 
         if (activeCodeTab === 'css') {
           setCssValue(content.trim());
