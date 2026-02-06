@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, FlatList, StyleSheet, Text, View } from 'react-native';
 import { Divider, Portal } from 'react-native-paper';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 
@@ -61,6 +61,7 @@ const SetCategoryModal: React.FC<SetCategoryModalProps> = ({
         </Text>
         <FlatList
           data={categories}
+          style={styles.categoryList}
           renderItem={({ item }) => (
             <Checkbox
               status={
@@ -127,6 +128,9 @@ const SetCategoryModal: React.FC<SetCategoryModalProps> = ({
 export default SetCategoryModal;
 
 const styles = StyleSheet.create({
+  categoryList: {
+    maxHeight: Dimensions.get('window').height * 0.4,
+  },
   divider: { height: 1, width: '90%', marginLeft: '5%' },
   btnContainer: {
     flexDirection: 'row',
