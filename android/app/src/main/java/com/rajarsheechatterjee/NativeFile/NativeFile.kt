@@ -74,13 +74,21 @@ class NativeFile(context: ReactApplicationContext) :
     }
 
     override fun writeFile(path: String, content: String) {
-        val fw = FileWriter(path)
-        fw.write(content)
-        fw.close()
+        try {
+            val fw = FileWriter(path)
+            fw.write(content)
+            fw.close()
+        } catch (e: IOException) {
+            throw Exception("Failed to write file '$path': ${e.message}")
+        }
     }
 
     override fun readFile(path: String): String {
-        return File(path).bufferedReader().readText()
+        val file = File(path)
+        if (!file.exists()) {
+            throw Exception("File not found: '$path'")
+        }
+        return file.bufferedReader().readText()
     }
 
     override fun copyFile(filepath: String, destPath: String) {
@@ -97,17 +105,27 @@ class NativeFile(context: ReactApplicationContext) :
         destPath: String,
         onDone: (() -> Unit)? = null,
     ) {
-        val inputStream = getInputStream(filepath)
-        val outputStream = getOutputStream(destPath)
-        val buffer = ByteArray(BUFFER_SIZE)
-        var length: Int
-        while (inputStream.read(buffer).also { length = it } > 0) {
-            outputStream.write(buffer, 0, length)
-        }
-        inputStream.close()
-        outputStream.close()
-        if (onDone != null) {
-            onDone()
+        try {
+            val inputStream = getInputStream(filepath)
+            try {
+                val outputStream = getOutputStream(destPath)
+                try {
+                    val buffer = ByteArray(BUFFER_SIZE)
+                    var length: Int
+                    while (inputStream.read(buffer).also { length = it } > 0) {
+                        outputStream.write(buffer, 0, length)
+                    }
+                } finally {
+                    outputStream.close()
+                }
+            } finally {
+                inputStream.close()
+            }
+            if (onDone != null) {
+                onDone()
+            }
+        } catch (e: IOException) {
+            throw Exception("Failed to copy file from '$filepath' to '$destPath': ${e.message}")
         }
     }
 
