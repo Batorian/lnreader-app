@@ -191,18 +191,21 @@ class NativeFile(context: ReactApplicationContext) :
                         }
 
                         override fun onResponse(call: Call, response: Response) {
-                            if (!response.isSuccessful || response.body == null) {
-                                promise.reject(Exception("Failed to download load: ${response.code}"))
-                                return
-                            }
-                            try {
-                                val inputStream = decompressStream(response.body!!.byteStream())
-                                FileOutputStream(destPath).use { fos ->
-                                    inputStream.copyTo(fos, BUFFER_SIZE)
+                            response.use {
+                                if (!it.isSuccessful || it.body == null) {
+                                    promise.reject(Exception("Failed to download: ${it.code}"))
+                                    return
                                 }
-                                promise.resolve(null)
-                            } catch (e: Exception) {
-                                promise.reject(e)
+                                try {
+                                    decompressStream(it.body!!.byteStream()).use { inputStream ->
+                                        FileOutputStream(destPath).use { fos ->
+                                            inputStream.copyTo(fos, BUFFER_SIZE)
+                                        }
+                                    }
+                                    promise.resolve(null)
+                                } catch (e: Exception) {
+                                    promise.reject(e)
+                                }
                             }
                         }
                     })
