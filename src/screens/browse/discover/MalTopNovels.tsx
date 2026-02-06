@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -97,6 +97,25 @@ const BrowseMalScreen = ({ navigation }: BrowseMalScreenProps) => {
     );
   };
 
+  const loadingMore = useRef(false);
+
+  const onScroll = useCallback(
+    ({ nativeEvent }: { nativeEvent: NativeScrollEvent }) => {
+      if (!searchText && !loadingMore.current && isCloseToBottom(nativeEvent)) {
+        loadingMore.current = true;
+
+        setLimit(before => {
+          const newLimit = before + 50;
+          getNovels(newLimit).finally(() => {
+            loadingMore.current = false;
+          });
+          return newLimit;
+        });
+      }
+    },
+    [searchText, getNovels],
+  );
+
   const ListEmptyComponent = useCallback(
     () => (
       <ErrorView
@@ -145,12 +164,7 @@ const BrowseMalScreen = ({ navigation }: BrowseMalScreenProps) => {
           keyExtractor={(item, index) => item.novelName + index}
           renderItem={renderItem}
           ListEmptyComponent={ListEmptyComponent}
-          onScroll={({ nativeEvent }) => {
-            if (!searchText && isCloseToBottom(nativeEvent)) {
-              getNovels(limit + 50);
-              setLimit(before => before + 50);
-            }
-          }}
+          onScroll={onScroll}
           ListFooterComponent={
             !searchText ? (
               <View style={styles.paddingVertical}>

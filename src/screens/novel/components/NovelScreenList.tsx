@@ -1,7 +1,7 @@
 import * as React from 'react';
 import ChapterItem from './ChapterItem';
 import NovelInfoHeader from './Info/NovelInfoHeader';
-import { useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { pickCustomNovelCover } from '@database/queries/NovelQueries';
 import { ChapterInfo, NovelInfo } from '@database/types';
 import { useBoolean } from '@hooks/index';
@@ -119,18 +119,26 @@ const NovelScreenList = ({
 
   const deleteDownloadsSnackbar = useBoolean();
 
-  const onPageScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const y = event.nativeEvent.contentOffset.y;
+  const extraData = useMemo(
+    () => [chapters.length, selected.length, novel.id, loading, downloadQueue.length],
+    [chapters.length, selected.length, novel.id, loading, downloadQueue.length],
+  );
 
-    headerOpacity.set(y < 50 ? 0 : (y - 50) / 150);
-    const currentScrollPosition = Math.floor(y) ?? 0;
-    if (useFabForContinueReading && lastRead) {
-      setIsFabExtended(currentScrollPosition <= 0);
-    }
+  const onPageScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const y = event.nativeEvent.contentOffset.y;
 
-    const screenHeight = Dimensions.get('window').height;
-    setShowScrollToTop(currentScrollPosition > screenHeight / 2);
-  };
+      headerOpacity.set(y < 50 ? 0 : (y - 50) / 150);
+      const currentScrollPosition = Math.floor(y) ?? 0;
+      if (useFabForContinueReading && lastRead) {
+        setIsFabExtended(currentScrollPosition <= 0);
+      }
+
+      const screenHeight = Dimensions.get('window').height;
+      setShowScrollToTop(currentScrollPosition > screenHeight / 2);
+    },
+    [headerOpacity, useFabForContinueReading, lastRead],
+  );
 
   const onRefresh = async () => {
     if (novel.id !== 'NO_ID') {
@@ -318,13 +326,7 @@ const NovelScreenList = ({
         estimatedItemSize={64}
         data={chapters}
         recycleItems
-        extraData={[
-          chapters.length,
-          selected.length,
-          novel.id,
-          loading,
-          downloadQueue.length,
-        ]}
+        extraData={extraData}
         // ListEmptyComponent={ListEmptyComponent}
         ListFooterComponent={
           !fetching ? (
@@ -376,6 +378,7 @@ const NovelScreenList = ({
         onEndReached={getNextChapterBatch}
         onEndReachedThreshold={6}
         onScroll={onPageScroll}
+        scrollEventThrottle={16}
         drawDistance={1000}
         ListHeaderComponent={
           <NovelInfoHeader
