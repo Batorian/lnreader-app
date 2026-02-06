@@ -153,7 +153,7 @@ const LibraryScreen = ({ navigation }: LibraryScreenProps) => {
   const pickAndImport = useCallback(() => {
     DocumentPicker.getDocumentAsync({
       type: 'application/epub+zip',
-      copyToCacheDirectory: true,
+      copyToCacheDirectory: false,
       multiple: true,
     }).then(importNovel);
   }, [importNovel]);
