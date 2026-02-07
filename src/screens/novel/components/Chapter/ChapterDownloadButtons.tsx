@@ -47,9 +47,10 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
       return; // Skip the first render as it leads to 'Maximum update depth exceeded.' error
     }
     if (!isDownloading) {
-      const isDownloadedValue = isChapterDownloaded(chapterId);
-      setDownloaded(isDownloadedValue);
-      setChapterDownloaded?.(isDownloadedValue);
+      isChapterDownloaded(chapterId).then(isDownloadedValue => {
+        setDownloaded(isDownloadedValue);
+        setChapterDownloaded?.(isDownloadedValue);
+      });
     }
   }, [chapterId, isDownloading, setChapterDownloaded]);
   if (isDownloading || downloaded === undefined) {

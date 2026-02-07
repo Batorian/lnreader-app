@@ -19,18 +19,20 @@ export const insertNovelAndChapters = async (
 ): Promise<number | undefined> => {
   const insertNovelQuery =
     'INSERT OR IGNORE INTO Novel (path, pluginId, name, cover, summary, author, artist, status, genres, totalPages) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
-  const novelId: number | undefined = db.runSync(insertNovelQuery, [
-    sourceNovel.path,
-    pluginId,
-    sourceNovel.name,
-    sourceNovel.cover || null,
-    sourceNovel.summary || null,
-    sourceNovel.author || null,
-    sourceNovel.artist || null,
-    sourceNovel.status || null,
-    sourceNovel.genres || null,
-    sourceNovel.totalPages || 0,
-  ]).lastInsertRowId;
+  const novelId: number | undefined = (
+    await db.runAsync(insertNovelQuery, [
+      sourceNovel.path,
+      pluginId,
+      sourceNovel.name,
+      sourceNovel.cover || null,
+      sourceNovel.summary || null,
+      sourceNovel.author || null,
+      sourceNovel.artist || null,
+      sourceNovel.status || null,
+      sourceNovel.genres || null,
+      sourceNovel.totalPages || 0,
+    ])
+  ).lastInsertRowId;
 
   if (novelId) {
     if (sourceNovel.cover) {
@@ -43,7 +45,7 @@ export const insertNovelAndChapters = async (
         novelCoverPath,
         getPlugin(pluginId)?.imageRequestInit,
       );
-      db.runSync(
+      await db.runAsync(
         'UPDATE Novel SET cover = ? WHERE id = ?',
         novelCoverUri,
         novelId,
@@ -68,8 +70,8 @@ export const getNovelById = (novelId: number) => {
 export const getNovelByPath = (
   novelPath: string,
   pluginId: string,
-): NovelInfo | null => {
-  return db.getFirstSync<NovelInfo>(
+) => {
+  return db.getFirstAsync<NovelInfo>(
     'SELECT * FROM Novel WHERE path = ? AND pluginId = ?',
     novelPath,
     pluginId,
@@ -83,7 +85,7 @@ export const switchNovelToLibraryQuery = async (
   novelPath: string,
   pluginId: string,
 ): Promise<NovelInfo | undefined> => {
-  const novel = getNovelByPath(novelPath, pluginId);
+  const novel = await getNovelByPath(novelPath, pluginId);
   if (novel) {
     await db.runAsync(
       'UPDATE Novel SET inLibrary = ? WHERE id = ?',
@@ -125,11 +127,11 @@ export const switchNovelToLibraryQuery = async (
 };
 
 // allow to delete local novels
-export const removeNovelsFromLibrary = (novelIds: Array<number>) => {
-  db.runSync(
+export const removeNovelsFromLibrary = async (novelIds: Array<number>) => {
+  await db.runAsync(
     `UPDATE Novel SET inLibrary = 0 WHERE id IN (${novelIds.join(', ')})`,
   );
-  db.runSync(
+  await db.runAsync(
     `DELETE FROM NovelCategory WHERE novelId IN (${novelIds.join(', ')})`,
   );
   showToast(getString('browseScreen.removeFromLibrary'));
@@ -151,8 +153,8 @@ export const restoreLibrary = async (novel: NovelInfo) => {
   const sourceNovel = await fetchNovel(novel.pluginId, novel.path);
   let novelId: number | undefined;
 
-  await db.withExclusiveTransactionAsync(async tx => {
-    const result = await tx.runAsync(
+  await db.withTransactionAsync(async () => {
+    const result = await db.runAsync(
       restoreFromBackupQuery,
       sourceNovel.path,
       novel.name,
@@ -229,11 +231,11 @@ export const updateNovelCategoryById = async (
   }
 };
 
-export const updateNovelCategories = (
+export const updateNovelCategories = async (
   novelIds: number[],
   categoryIds: number[],
-): void => {
-  db.runSync(
+): Promise<void> => {
+  await db.runAsync(
     `DELETE FROM NovelCategory WHERE novelId IN (${novelIds.join(
       ',',
     )}) AND categoryId != 2`,
@@ -242,7 +244,7 @@ export const updateNovelCategories = (
   if (categoryIds.length) {
     for (const novelId of novelIds) {
       for (const categoryId of categoryIds) {
-        db.runSync(
+        await db.runAsync(
           `INSERT INTO NovelCategory (novelId, categoryId) VALUES (${novelId}, ${categoryId})`,
         );
       }
@@ -250,10 +252,10 @@ export const updateNovelCategories = (
   } else {
     for (const novelId of novelIds) {
       // hacky: insert local novel category -> failed -> ignored
-      db.runSync(
-        `INSERT OR IGNORE INTO NovelCategory (novelId, categoryId) 
+      await db.runAsync(
+        `INSERT OR IGNORE INTO NovelCategory (novelId, categoryId)
          VALUES (
-          ${novelId}, 
+          ${novelId},
           IFNULL((SELECT categoryId FROM NovelCategory WHERE novelId = ${novelId}), (SELECT id FROM Category WHERE sort = 1))
         )`,
       );

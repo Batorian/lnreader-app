@@ -59,22 +59,22 @@ export const migrateNovel = async (
   }));
 
   let fromChapters = await getNovelChapters(fromNovel.id);
-  let toNovel = getNovelByPath(toNovelPath, pluginId);
+  let toNovel = await getNovelByPath(toNovelPath, pluginId);
   let toChapters: ChapterInfo[];
   if (toNovel) {
     toChapters = await getNovelChapters(toNovel.id);
   } else {
     const fetchedNovel = await fetchNovel(pluginId, toNovelPath);
     await insertNovelAndChapters(pluginId, fetchedNovel);
-    toNovel = getNovelByPath(toNovelPath, pluginId);
+    toNovel = await getNovelByPath(toNovelPath, pluginId);
     if (!toNovel) {
       return;
     }
     toChapters = await getNovelChapters(toNovel.id);
   }
 
-  await db.withExclusiveTransactionAsync(async tx => {
-    await tx.runAsync(
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
       migrateNovelMetaDataQuery,
       fromNovel.cover || toNovel!.cover || '',
       fromNovel.summary || toNovel!.summary || '',
@@ -85,12 +85,12 @@ export const migrateNovel = async (
       toNovel!.id,
     );
 
-    await tx.runAsync(
+    await db.runAsync(
       'UPDATE OR IGNORE NovelCategory SET novelId = ? WHERE novelId = ?',
       toNovel!.id,
       fromNovel.id,
     );
-    await tx.runAsync('DELETE FROM Novel WHERE id = ?', fromNovel.id);
+    await db.runAsync('DELETE FROM Novel WHERE id = ?', fromNovel.id);
   });
 
   setMMKVObject(

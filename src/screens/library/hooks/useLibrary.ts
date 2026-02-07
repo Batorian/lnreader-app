@@ -92,8 +92,8 @@ export const useLibrary = (): UseLibraryReturnType => {
 
       // Important to get correct chapters count
       // Count is set by sql trigger
-      refreshCategories();
-      const novels = getLibraryNovelsFromDb(
+      await refreshCategories();
+      const novels = await getLibraryNovelsFromDb(
         sortOrder,
         filter,
         searchText,
@@ -156,7 +156,7 @@ export const useLibraryNovels = () => {
   const [library, setLibrary] = useState<NovelInfo[]>([]);
 
   const getLibrary = async () => {
-    const novels = getLibraryNovelsFromDb();
+    const novels = await getLibraryNovelsFromDb();
 
     setLibrary(novels);
   };

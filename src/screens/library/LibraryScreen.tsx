@@ -469,8 +469,8 @@ const LibraryScreen = ({ navigation }: LibraryScreenProps) => {
             },
             {
               icon: 'delete-outline',
-              onPress: () => {
-                removeNovelsFromLibrary(selectedNovelIds);
+              onPress: async () => {
+                await removeNovelsFromLibrary(selectedNovelIds);
                 setSelectedNovelIds([]);
                 refetchLibrary();
               },

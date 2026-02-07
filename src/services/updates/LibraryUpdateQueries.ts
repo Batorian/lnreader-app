@@ -25,9 +25,9 @@ const updateNovelMetadata = async (
     cover = novelCoverUri + '?' + Date.now();
   }
 
-  db.runSync(
-    `UPDATE Novel SET 
-          name = ?, cover = ?, summary = ?, author = ?, artist = ?, 
+  await db.runAsync(
+    `UPDATE Novel SET
+          name = ?, cover = ?, summary = ?, author = ?, artist = ?,
           genres = ?, status = ?, totalPages = ?
           WHERE id = ?
         `,
@@ -45,8 +45,8 @@ const updateNovelMetadata = async (
   );
 };
 
-const updateNovelTotalPages = (novelId: number, totalPages: number) => {
-  db.runSync('UPDATE Novel SET totalPages = ? WHERE id = ?', [
+const updateNovelTotalPages = async (novelId: number, totalPages: number) => {
+  await db.runAsync('UPDATE Novel SET totalPages = ? WHERE id = ?', [
     totalPages,
     novelId,
   ]);
@@ -59,7 +59,7 @@ const updateNovelChapters = (
   downloadNewChapters?: boolean,
   page?: string,
 ) =>
-  db.withExclusiveTransactionAsync(async tx => {
+  db.withTransactionAsync(async () => {
     for (let position = 0; position < chapters.length; position++) {
       const {
         name,
@@ -70,7 +70,7 @@ const updateNovelChapters = (
       } = chapters[position];
       const chapterPage = page || customPage || '1';
 
-      const result = await tx.runAsync(
+      const result = await db.runAsync(
         `
           INSERT INTO Chapter (path, name, releaseTime, novelId, updatedTime, chapterNumber, page, position)
           SELECT ?, ?, ?, ?, datetime('now','localtime'), ?, ?, ?
@@ -101,7 +101,7 @@ const updateNovelChapters = (
           });
         }
       } else {
-        await tx.runAsync(
+        await db.runAsync(
           `
             UPDATE Chapter SET
               name = ?, releaseTime = ?, updatedTime = datetime('now','localtime'), page = ?, position = ?
@@ -143,7 +143,7 @@ const updateNovel = async (
     await updateNovelMetadata(pluginId, novelId, novel);
   } else if (novel.totalPages) {
     // at least update totalPages,
-    updateNovelTotalPages(novelId, novel.totalPages);
+    await updateNovelTotalPages(novelId, novel.totalPages);
   }
 
   await updateNovelChapters(

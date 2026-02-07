@@ -7,7 +7,7 @@ export const getLibraryNovelsFromDb = (
   searchText?: string,
   downloadedOnlyMode?: boolean,
   excludeLocalNovels?: boolean,
-): NovelInfo[] => {
+) => {
   let query = 'SELECT * FROM Novel WHERE inLibrary = 1';
 
   if (excludeLocalNovels) {
@@ -30,25 +30,25 @@ export const getLibraryNovelsFromDb = (
     query += ` ORDER BY ${sortOrder}`;
   }
 
-  return db.getAllSync<NovelInfo>(query, searchText ? `%${searchText}%` : '');
+  return db.getAllAsync<NovelInfo>(query, searchText ? `%${searchText}%` : '');
 };
 
 const getNovelOfCategoryQuery =
   'SELECT DISTINCT novelId FROM NovelCategory WHERE 1 = 1';
 const getNovelsFromIDListQuery = 'SELECT * FROM Novel WHERE inLibrary = 1 ';
 
-export const getLibraryWithCategory = (
+export const getLibraryWithCategory = async (
   categoryId?: number | null,
   onlyUpdateOngoingNovels?: boolean,
   excludeLocalNovels?: boolean,
-): LibraryNovelInfo[] => {
+): Promise<LibraryNovelInfo[]> => {
   let categoryQuery = getNovelOfCategoryQuery;
 
   if (categoryId) {
     categoryQuery += ` AND categoryId = ${categoryId}`;
   }
 
-  const idRows = db.getAllSync<{ novelId: number }>(categoryQuery);
+  const idRows = await db.getAllAsync<{ novelId: number }>(categoryQuery);
 
   if (!idRows || idRows.length === 0) return [];
 
@@ -66,5 +66,5 @@ export const getLibraryWithCategory = (
     novelQuery += " AND status = 'Ongoing'";
   }
 
-  return db.getAllSync<LibraryNovelInfo>(novelQuery);
+  return db.getAllAsync<LibraryNovelInfo>(novelQuery);
 };

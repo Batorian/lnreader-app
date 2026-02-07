@@ -22,13 +22,13 @@ export const insertChapters = async (
     return;
   }
 
-  await db.withExclusiveTransactionAsync(async tx => {
+  await db.withTransactionAsync(async () => {
     for (let index = 0; index < chapters.length; index++) {
       const chapter = chapters[index];
       const chapterName = chapter.name ?? 'Chapter ' + (index + 1);
       const chapterPage = chapter.page || '1';
 
-      const result = await tx.runAsync(
+      const result = await db.runAsync(
         `
           INSERT INTO Chapter (path, name, releaseTime, novelId, chapterNumber, page, position)
           SELECT ?, ?, ?, ?, ?, ?, ?
@@ -48,7 +48,7 @@ export const insertChapters = async (
       const insertId = result.lastInsertRowId;
 
       if (!insertId || insertId < 0) {
-        await tx.runAsync(
+        await db.runAsync(
           `
             UPDATE Chapter SET
               page = ?, position = ?, name = ?, releaseTime = ?, chapterNumber = ?
@@ -209,7 +209,7 @@ export const clearUpdates = () =>
 // #region Selectors
 
 export const getCustomPages = (novelId: number) =>
-  db.getAllSync<{ page: string }>(
+  db.getAllAsync<{ page: string }>(
     'SELECT DISTINCT page from Chapter WHERE novelId = ?',
     novelId,
   );
@@ -272,11 +272,13 @@ export const getPageChapters = (
   );
 };
 
-export const getChapterCount = (novelId: number, page: string = '1') =>
-  db.getFirstSync<{ 'COUNT(*)': number }>(
-    'SELECT COUNT(*) FROM Chapter WHERE novelId = ? AND page = ?',
-    novelId,
-    page,
+export const getChapterCount = async (novelId: number, page: string = '1') =>
+  (
+    await db.getFirstAsync<{ 'COUNT(*)': number }>(
+      'SELECT COUNT(*) FROM Chapter WHERE novelId = ? AND page = ?',
+      novelId,
+      page,
+    )
   )?.['COUNT(*)'] ?? 0;
 
 export const getPageChaptersBatched = (
@@ -286,7 +288,7 @@ export const getPageChaptersBatched = (
   page?: string,
   batch: number = 0,
 ) => {
-  return db.getAllSync<ChapterInfo>(
+  return db.getAllAsync<ChapterInfo>(
     getPageChaptersQuery(sort, filter, 300, 300 * batch),
     novelId,
     page || '1',
@@ -439,8 +441,8 @@ ORDER BY updatedTime DESC;
   return await result;
 };
 
-export const isChapterDownloaded = (chapterId: number) =>
-  !!db.getFirstSync<ChapterInfo>(
+export const isChapterDownloaded = async (chapterId: number) =>
+  !!(await db.getFirstAsync<ChapterInfo>(
     'SELECT * FROM Chapter WHERE id = ? AND isDownloaded = 1',
     chapterId,
-  );
+  ));

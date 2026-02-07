@@ -86,7 +86,7 @@ export const downloadChapter = async (
   const chapterText = await plugin.parseChapter(chapter.path);
   if (chapterText && chapterText.length) {
     await downloadFiles(chapterText, plugin, novel.id, chapter.id);
-    db.runSync('UPDATE Chapter SET isDownloaded = 1 WHERE id = ?', [
+    await db.runAsync('UPDATE Chapter SET isDownloaded = 1 WHERE id = ?', [
       chapter.id,
     ]);
 

@@ -66,9 +66,15 @@ export const useNovel = (novelOrPath: string | NovelInfo, pluginId: string) => {
   const [novel, setNovel] = useState<NovelInfo | undefined>(
     typeof novelOrPath === 'object' ? novelOrPath : undefined,
   );
-  const [pages, setPages] = useState<string[]>(
-    novel ? calculatePages(novel) : [],
-  );
+  const [pages, setPages] = useState<string[]>(() => {
+    if (novel && novel.totalPages > 0) {
+      const tmpPages = Array(novel.totalPages)
+        .fill(0)
+        .map((_, idx) => String(idx + 1));
+      return tmpPages.length > 1 ? tmpPages : ['1'];
+    }
+    return [];
+  });
 
   const { defaultChapterSort } = useAppSettings();
 
@@ -92,28 +98,20 @@ export const useNovel = (novelOrPath: string | NovelInfo, pluginId: string) => {
     batch: number;
     total: number;
     totalChapters?: number;
-  }>(
-    typeof novelOrPath === 'object'
-      ? {
-          batch: 0,
-          total: 0,
-          totalChapters: getChapterCount(novelOrPath.id, pages[pageIndex]),
-        }
-      : { batch: 0, total: 0 },
-  );
+  }>({ batch: 0, total: 0 });
 
   const settingsSort = novelSettings.sort || defaultChapterSort;
   // #endregion
   // #region setters
 
-  function calculatePages(tmpNovel: NovelInfo) {
+  async function calculatePages(tmpNovel: NovelInfo) {
     let tmpPages: string[];
     if (tmpNovel.totalPages > 0) {
       tmpPages = Array(tmpNovel.totalPages)
         .fill(0)
         .map((_, idx) => String(idx + 1));
     } else {
-      tmpPages = getCustomPages(tmpNovel.id).map(c => c.page);
+      tmpPages = (await getCustomPages(tmpNovel.id)).map(c => c.page);
     }
 
     return tmpPages.length > 1 ? tmpPages : ['1'];
@@ -218,20 +216,21 @@ export const useNovel = (novelOrPath: string | NovelInfo, pluginId: string) => {
   // #region getters
 
   const getNovel = useCallback(async () => {
-    let tmpNovel = getNovelByPath(novelPath, pluginId);
+    let tmpNovel = await getNovelByPath(novelPath, pluginId);
     if (!tmpNovel) {
       const sourceNovel = await fetchNovel(pluginId, novelPath).catch(() => {
         throw new Error(getString('updatesScreen.unableToGetNovel'));
       });
 
       await insertNovelAndChapters(pluginId, sourceNovel);
-      tmpNovel = getNovelByPath(novelPath, pluginId);
+      tmpNovel = await getNovelByPath(novelPath, pluginId);
 
       if (!tmpNovel) {
         return;
       }
     }
-    setPages(calculatePages(tmpNovel));
+
+    setPages(await calculatePages(tmpNovel));
 
     setNovel(tmpNovel);
   }, [novelPath, pluginId]);
@@ -249,11 +248,11 @@ export const useNovel = (novelOrPath: string | NovelInfo, pluginId: string) => {
         page,
       ] as const;
 
-      let chapterCount = getChapterCount(novel.id, page);
+      let chapterCount = await getChapterCount(novel.id, page);
 
       if (chapterCount) {
         try {
-          newChapters = getPageChaptersBatched(...config) || [];
+          newChapters = (await getPageChaptersBatched(...config)) || [];
         } catch (error) {
           console.error('teaser', error);
         }
@@ -270,7 +269,7 @@ export const useNovel = (novelOrPath: string | NovelInfo, pluginId: string) => {
         });
         await insertChapters(novel.id, sourceChapters);
         newChapters = await _getPageChapters(...config);
-        chapterCount = getChapterCount(novel.id, page);
+        chapterCount = await getChapterCount(novel.id, page);
       }
 
       setBatchInformation({
@@ -291,7 +290,7 @@ export const useNovel = (novelOrPath: string | NovelInfo, pluginId: string) => {
     settingsSort,
   ]);
 
-  const getNextChapterBatch = useCallback(() => {
+  const getNextChapterBatch = useCallback(async () => {
     const page = pages[pageIndex];
     const nextBatch = batchInformation.batch + 1;
     if (novel && page && nextBatch <= batchInformation.total) {
@@ -299,13 +298,13 @@ export const useNovel = (novelOrPath: string | NovelInfo, pluginId: string) => {
 
       try {
         newChapters =
-          getPageChaptersBatched(
+          (await getPageChaptersBatched(
             novel.id,
             settingsSort,
             novelSettings.filter,
             page,
             nextBatch,
-          ) || [];
+          )) || [];
       } catch (error) {
         console.error('teaser', error);
       }
@@ -330,19 +329,23 @@ export const useNovel = (novelOrPath: string | NovelInfo, pluginId: string) => {
       }
 
       // Load all batches from current + 1 up to targetBatch
-      for (let batch = batchInformation.batch + 1; batch <= targetBatch; batch++) {
+      for (
+        let batch = batchInformation.batch + 1;
+        batch <= targetBatch;
+        batch++
+      ) {
         if (batch > batchInformation.total) break;
 
         let newChapters: ChapterInfo[] = [];
         try {
           newChapters =
-            getPageChaptersBatched(
+            (await getPageChaptersBatched(
               novel.id,
               settingsSort,
               novelSettings.filter,
               page,
               batch,
-            ) || [];
+            )) || [];
         } catch (error) {
           console.error('Error loading batch', batch, error);
         }
@@ -567,6 +570,9 @@ export const useNovel = (novelOrPath: string | NovelInfo, pluginId: string) => {
 
   useEffect(() => {
     if (novel) {
+      if (pages.length === 0) {
+        calculatePages(novel).then(setPages);
+      }
       setLoading(false);
     } else {
       getNovel().finally(() => {
@@ -578,7 +584,10 @@ export const useNovel = (novelOrPath: string | NovelInfo, pluginId: string) => {
   }, [getNovel, novel]);
 
   useEffect(() => {
-    if (novel === undefined) return;
+    if (novel === undefined || pages.length === 0) {
+      return;
+    }
+
     setFetching(true);
     getChapters()
       .catch(e => {
