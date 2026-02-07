@@ -1,7 +1,5 @@
-/* eslint-disable react-native/no-inline-styles */
-import React, { memo, ReactNode } from 'react';
+import React, { memo, useCallback, useMemo, ReactNode } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import color from 'color';
 import {
   ChapterBookmarkButton,
   DownloadButton,
@@ -12,88 +10,113 @@ import MaterialCommunityIcons from '@react-native-vector-icons/material-design-i
 import { getString } from '@strings/translations';
 
 interface ChapterItemProps {
+  chapter: ChapterInfo;
   isDownloading?: boolean;
   isBookmarked?: boolean;
-  chapter: ChapterInfo;
-  theme: ThemeColors;
-  showChapterTitles: boolean;
   isSelected?: boolean;
-  downloadChapter: () => void;
-  deleteChapter: () => void;
-  onSelectPress?: (chapter: ChapterInfo) => void;
-  onSelectLongPress?: (chapter: ChapterInfo) => void;
-  navigateToChapter: (chapter: ChapterInfo) => void;
-  setChapterDownloaded?: (value: boolean) => void;
-  left?: ReactNode;
   isLocal: boolean;
   isUpdateCard?: boolean;
+  theme: ThemeColors;
+  showChapterTitles: boolean;
   novelName: string;
+  left?: ReactNode;
+  onDeleteChapter: (chapter: ChapterInfo) => void;
+  onDownloadChapter: (chapter: ChapterInfo) => void;
+  onSelectPress: (chapter: ChapterInfo) => void;
+  onSelectLongPress?: (chapter: ChapterInfo) => void;
 }
 
 const ChapterItem: React.FC<ChapterItemProps> = ({
+  chapter,
   isDownloading,
   isBookmarked,
-  chapter,
+  isSelected,
+  isLocal,
+  isUpdateCard,
   theme,
   showChapterTitles,
-  downloadChapter,
-  deleteChapter,
-  isSelected,
+  novelName,
+  left,
+  onDeleteChapter,
+  onDownloadChapter,
   onSelectPress,
   onSelectLongPress,
-  navigateToChapter,
-  setChapterDownloaded,
-  isLocal,
-  left,
-  isUpdateCard,
-  novelName,
 }) => {
   const { id, name, unread, releaseTime, bookmark, chapterNumber, progress } =
     chapter;
 
   isBookmarked ??= bookmark;
 
+  const handlePress = useCallback(
+    () => onSelectPress(chapter),
+    [onSelectPress, chapter],
+  );
+  const handleLongPress = useCallback(
+    () => onSelectLongPress?.(chapter),
+    [onSelectLongPress, chapter],
+  );
+  const handleDelete = useCallback(
+    () => onDeleteChapter(chapter),
+    [onDeleteChapter, chapter],
+  );
+  const handleDownload = useCallback(
+    () => onDownloadChapter(chapter),
+    [onDownloadChapter, chapter],
+  );
+
+  const selectedStyle = useMemo(
+    () =>
+      isSelected
+        ? [styles.chapterCardContainer, { backgroundColor: theme.rippleColor }]
+        : styles.chapterCardContainer,
+    [isSelected, theme.rippleColor],
+  );
+
+  const titleColor = useMemo(
+    () =>
+      !unread ? theme.outline : bookmark ? theme.primary : theme.onSurface,
+    [unread, bookmark, theme.outline, theme.primary, theme.onSurface],
+  );
+
+  const releaseColor = useMemo(
+    () =>
+      !unread
+        ? theme.outline
+        : bookmark
+          ? theme.primary
+          : theme.onSurfaceVariant,
+    [unread, bookmark, theme.outline, theme.primary, theme.onSurfaceVariant],
+  );
+
+  const ripple = useMemo(
+    () => ({ color: theme.rippleColor }),
+    [theme.rippleColor],
+  );
+
   return (
     <View key={'chapterItem' + id}>
       <Pressable
-        style={[
-          styles.chapterCardContainer,
-          isSelected && {
-            backgroundColor: color(theme.primary).alpha(0.12).string(),
-          },
-        ]}
-        onPress={() => {
-          if (onSelectPress) {
-            onSelectPress(chapter);
-          } else {
-            navigateToChapter(chapter);
-          }
-        }}
-        onLongPress={() => onSelectLongPress?.(chapter)}
-        android_ripple={{ color: theme.rippleColor }}
+        style={selectedStyle}
+        onPress={handlePress}
+        onLongPress={handleLongPress}
+        android_ripple={ripple}
       >
         <View style={styles.row}>
           {left}
           {isBookmarked ? <ChapterBookmarkButton theme={theme} /> : null}
-          <View style={{ flex: 1 }}>
+          <View style={styles.flex1}>
             {isUpdateCard ? (
               <Text
-                style={{
-                  fontSize: 14,
-                  color: unread ? theme.onSurface : theme.outline,
-                }}
+                style={[
+                  styles.updateCardName,
+                  { color: unread ? theme.onSurface : theme.outline },
+                ]}
                 numberOfLines={1}
               >
                 {novelName}
               </Text>
             ) : null}
-            <View
-              style={{
-                display: 'flex',
-                flexDirection: 'row',
-                alignItems: 'center',
-              }}
-            >
+            <View style={styles.titleRow}>
               {unread ? (
                 <MaterialCommunityIcons
                   name="circle"
@@ -104,42 +127,26 @@ const ChapterItem: React.FC<ChapterItemProps> = ({
               ) : null}
 
               <Text
-                style={{
-                  fontSize: isUpdateCard ? 12 : 14,
-                  color: !unread
-                    ? theme.outline
-                    : bookmark
-                      ? theme.primary
-                      : theme.onSurface,
-                  flex: 1,
-                }}
+                style={[
+                  isUpdateCard ? styles.textSmall : styles.textNormal,
+                  { color: titleColor },
+                  styles.flex1,
+                ]}
                 numberOfLines={1}
                 ellipsizeMode="tail"
               >
                 {showChapterTitles
                   ? name
                   : getString('novelScreen.chapterChapnum', {
-                    num: chapterNumber,
-                  })}
+                      num: chapterNumber,
+                    })}
               </Text>
             </View>
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-              }}
-            >
+            <View style={styles.metaRow}>
               {releaseTime && !isUpdateCard ? (
                 <Text
                   style={[
-                    {
-                      color: !unread
-                        ? theme.outline
-                        : bookmark
-                          ? theme.primary
-                          : theme.onSurfaceVariant,
-                      marginTop: 4,
-                    },
+                    { color: releaseColor, marginTop: 4 },
                     styles.text,
                   ]}
                   numberOfLines={1}
@@ -149,12 +156,14 @@ const ChapterItem: React.FC<ChapterItemProps> = ({
               ) : null}
               {!isUpdateCard && progress && progress > 0 && chapter.unread ? (
                 <Text
-                  style={{
-                    color: theme.outline,
-                    marginStart: chapter.releaseTime ? 5 : 0,
-                    fontSize: 12,
-                    marginTop: 4,
-                  }}
+                  style={[
+                    styles.text,
+                    {
+                      color: theme.outline,
+                      marginStart: chapter.releaseTime ? 5 : 0,
+                      marginTop: 4,
+                    },
+                  ]}
                   numberOfLines={1}
                 >
                   {chapter.releaseTime ? '•  ' : null}
@@ -168,11 +177,9 @@ const ChapterItem: React.FC<ChapterItemProps> = ({
           <DownloadButton
             isDownloading={isDownloading}
             isDownloaded={chapter.isDownloaded}
-            chapterId={chapter.id}
             theme={theme}
-            setChapterDownloaded={setChapterDownloaded}
-            deleteChapter={deleteChapter}
-            downloadChapter={downloadChapter}
+            deleteChapter={handleDelete}
+            downloadChapter={handleDownload}
           />
         ) : null}
       </Pressable>
@@ -191,6 +198,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
+  flex1: {
+    flex: 1,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   row: {
     alignItems: 'center',
     flex: 1,
@@ -199,7 +213,20 @@ const styles = StyleSheet.create({
   text: {
     fontSize: 12,
   },
+  textNormal: {
+    fontSize: 14,
+  },
+  textSmall: {
+    fontSize: 12,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   unreadIcon: {
     marginEnd: 4,
+  },
+  updateCardName: {
+    fontSize: 14,
   },
 });

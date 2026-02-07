@@ -31,24 +31,29 @@ const PagePaginationControl: React.FC<PagePaginationControlProps> = ({
         indices.push(i);
       }
     } else {
+      // Always show first page if not current
       if (currentPageIndex !== 0) {
         indices.push(0);
       }
 
+      // Show page before current (with ellipsis if there's a gap)
       const leftPageIndex = currentPageIndex - 1;
       if (leftPageIndex > 0) {
         if (leftPageIndex > 1) {
           indices.push('ellipsis');
         }
-        indices.push(leftPageIndex);
       }
 
+      // Always show current page
       indices.push(currentPageIndex);
 
-      if (currentPageIndex < totalPages - 1) {
+      // Show ellipsis after current only if there's a gap to last page
+      const rightPageIndex = currentPageIndex + 1;
+      if (rightPageIndex < totalPages - 1) {
         indices.push('ellipsis');
       }
 
+      // Always show last page if not current
       if (currentPageIndex !== totalPages - 1) {
         indices.push(totalPages - 1);
       }
@@ -198,13 +203,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   container: {
-    flex: 1,
     alignItems: 'center',
     flexDirection: 'row',
     gap: 8,
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: 12,
+    marginBottom: 16,
   },
   disabledButton: {
     opacity: 0.5,
@@ -224,13 +228,16 @@ const styles = StyleSheet.create({
   },
   pageNumbersRow: {
     alignItems: 'center',
+    justifyContent: 'space-evenly',
+    flex: 1,
     flexDirection: 'row',
+    flexShrink: 1,
     gap: 8,
   },
   pageText: {
     fontSize: 15,
     letterSpacing: 0.15,
-    maxWidth: 100,
+    maxWidth: 80,
   },
   activeButton: {
     borderColor: 'transparent',

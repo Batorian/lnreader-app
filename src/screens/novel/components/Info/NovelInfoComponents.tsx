@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { memo, useCallback, useMemo, useState } from 'react';
 import {
   FlatList,
   StyleSheet,
@@ -43,27 +43,31 @@ const NovelInfoContainer = ({ children }: { children: React.ReactNode }) => (
   <View style={styles.novelInfoContainer}>{children}</View>
 );
 
-const CoverImage = ({
-  children,
-  source,
-  theme,
-  hideBackdrop,
-}: CoverImageProps) => {
-  if (hideBackdrop) {
-    return <View>{children}</View>;
-  } else {
+const CoverImage = memo(
+  ({ children, source, theme, hideBackdrop }: CoverImageProps) => {
+    const overlayBg = useMemo(
+      () => color(theme.background).alpha(0.7).string(),
+      [theme.background],
+    );
+    const overlayStyle = useMemo(
+      () => [{ backgroundColor: overlayBg }, styles.flex1],
+      [overlayBg],
+    );
+    const gradientColors = useMemo(
+      () => ['rgba(0,0,0,0)', theme.background] as const,
+      [theme.background],
+    );
+
+    if (hideBackdrop) {
+      return <View>{children}</View>;
+    }
     return (
       <ImageBackground source={source} style={styles.coverImage}>
-        <View
-          style={[
-            { backgroundColor: color(theme.background).alpha(0.7).string() },
-            styles.flex1,
-          ]}
-        >
+        <View style={overlayStyle}>
           {source.uri ? (
             <LinearGradient
-              colors={['rgba(0,0,0,0)', theme.background]}
-              locations={[0, 1]}
+              colors={gradientColors}
+              locations={GRADIENT_LOCATIONS}
               style={styles.linearGradient}
             >
               {children}
@@ -74,8 +78,10 @@ const CoverImage = ({
         </View>
       </ImageBackground>
     );
-  }
-};
+  },
+);
+
+const GRADIENT_LOCATIONS = [0, 1] as const;
 
 const NovelThumbnail = ({
   source,
@@ -170,7 +176,7 @@ const FollowButton = ({
   <View style={styles.followButtonContainer}>
     <Pressable
       android_ripple={{
-        color: color(theme.primary).alpha(0.12).string(),
+        color: theme.rippleColor,
         borderless: false,
       }}
       onPress={onPress}
@@ -234,26 +240,28 @@ const TrackerButton = ({
   </View>
 );
 
-const NovelGenres = ({
-  theme,
-  genres,
-}: {
-  theme: ThemeColors;
-  genres: string;
-}) => {
-  const data = genres.split(/,\s*/);
+const genreKeyExtractor = (_item: string, index: number) => 'genre' + index;
 
-  return (
-    <FlatList
-      contentContainerStyle={styles.genreContainer}
-      horizontal
-      data={data}
-      keyExtractor={(item, index) => 'genre' + index}
-      renderItem={({ item }) => <Chip label={item} theme={theme} />}
-      showsHorizontalScrollIndicator={false}
-    />
-  );
-};
+const NovelGenres = memo(
+  ({ theme, genres }: { theme: ThemeColors; genres: string }) => {
+    const data = useMemo(() => genres.split(/,\s*/), [genres]);
+    const renderGenre = useCallback(
+      ({ item }: { item: string }) => <Chip label={item} theme={theme} />,
+      [theme],
+    );
+
+    return (
+      <FlatList
+        contentContainerStyle={styles.genreContainer}
+        horizontal
+        data={data}
+        keyExtractor={genreKeyExtractor}
+        renderItem={renderGenre}
+        showsHorizontalScrollIndicator={false}
+      />
+    );
+  },
+);
 
 export {
   NovelInfoContainer,

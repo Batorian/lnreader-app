@@ -1,6 +1,5 @@
-import React, { memo, useMemo } from 'react';
+import React, { memo, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import color from 'color';
 
 import * as Clipboard from 'expo-clipboard';
 
@@ -39,6 +38,15 @@ import {
   VerticalBarSkeleton,
 } from '@components/Skeleton/Skeleton';
 import { useNovelContext } from '@screens/novel/NovelContext';
+import Animated, {
+  useAnimatedProps,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
+import useLoadingColors from '@components/Skeleton/useLoadingColors';
 
 interface NovelInfoHeaderProps {
   chapters: ChapterInfo[];
@@ -73,6 +81,57 @@ const getStatusIcon = (status?: string) => {
   return 'help';
 };
 
+const ChapterCountSkeleton = ({ theme }: { theme: ThemeColors }) => {
+  const sv = useSharedValue(0);
+  const { disableLoadingAnimations } = useAppSettings();
+  const [highlightColor, backgroundColor] = useLoadingColors(theme);
+
+  const animatedProps = useAnimatedProps(() => {
+    return {
+      left: (sv.value + '%') as `${number}%`,
+    };
+  });
+
+  React.useEffect(() => {
+    if (disableLoadingAnimations) return;
+    sv.value = withRepeat(
+      withSequence(0, withTiming(160, { duration: 1000 })),
+      -1,
+    );
+  }, [disableLoadingAnimations, sv]);
+
+  if (disableLoadingAnimations) {
+    return (
+      <View
+        style={[
+          styles.chapterCountSkeleton,
+          { backgroundColor: backgroundColor },
+        ]}
+      />
+    );
+  }
+
+  const LG = Animated.createAnimatedComponent(LinearGradient);
+
+  return (
+    <View
+      style={[styles.chapterCountSkeleton, { backgroundColor: backgroundColor }]}
+    >
+      <LG
+        start={[0, 0]}
+        end={[1, 0]}
+        locations={[0, 0.3, 0.7, 1]}
+        style={[animatedProps, styles.chapterCountGradient]}
+        colors={['transparent', highlightColor, highlightColor, 'transparent']}
+      />
+    </View>
+  );
+};
+
+const showNotAvailable = async () => {
+  showToast('Not available while loading');
+};
+
 const NovelInfoHeader = ({
   chapters,
   deleteDownloadsSnackbar,
@@ -101,20 +160,64 @@ const NovelInfoHeader = ({
     [novel.pluginId],
   );
 
-  const showNotAvailable = async () => {
-    showToast('Not available while loading');
-  };
+  const coverSource = useMemo(() => ({ uri: novel.cover }), [novel.cover]);
+
+  const handleTitlePress = useCallback(
+    () =>
+      navigation.replace('GlobalSearchScreen', {
+        searchText: novel.name,
+      }),
+    [navigation, novel.name],
+  );
+
+  const handleTitleLongPress = useCallback(() => {
+    Clipboard.setStringAsync(novel.name).then(() =>
+      showToast(getString('common.copiedToClipboard', { name: novel.name })),
+    );
+  }, [novel.name]);
+
+  const handleFollowNovel = useCallback(() => {
+    if (isLoading) {
+      showNotAvailable();
+      return;
+    }
+    followNovel();
+    if (novel.inLibrary && chapters.some(chapter => chapter.isDownloaded)) {
+      deleteDownloadsSnackbar.setTrue();
+    }
+  }, [
+    isLoading,
+    followNovel,
+    novel.inLibrary,
+    chapters,
+    deleteDownloadsSnackbar,
+  ]);
+
+  const handleTrackerSheet = useCallback(
+    () => trackerSheetRef.current?.present(),
+    [trackerSheetRef],
+  );
+
+  const handleOpenBottomSheet = useCallback(
+    () => novelBottomSheetRef.current?.present(),
+    [novelBottomSheetRef],
+  );
+
+  const ripple = useMemo(
+    () => ({ color: theme.rippleColor }),
+    [theme.rippleColor],
+  );
 
   return (
     <>
       <CoverImage
-        source={{ uri: novel.cover }}
+        source={coverSource}
         theme={theme}
         hideBackdrop={hideBackdrop}
       >
         <NovelInfoContainer>
           <NovelThumbnail
-            source={{ uri: novel.cover }}
+            source={coverSource}
             theme={theme}
             setCustomNovelCover={
               isLoading ? showNotAvailable : setCustomNovelCover
@@ -125,20 +228,8 @@ const NovelInfoHeader = ({
             <Row>
               <NovelTitle
                 theme={theme}
-                onPress={() =>
-                  navigation.replace('GlobalSearchScreen', {
-                    searchText: novel.name,
-                  })
-                }
-                onLongPress={() => {
-                  Clipboard.setStringAsync(novel.name).then(() =>
-                    showToast(
-                      getString('common.copiedToClipboard', {
-                        name: novel.name,
-                      }),
-                    ),
-                  );
-                }}
+                onPress={handleTitlePress}
+                onLongPress={handleTitleLongPress}
               >
                 {novel.name}
               </NovelTitle>
@@ -188,20 +279,8 @@ const NovelInfoHeader = ({
       <>
         <NovelScreenButtonGroup
           novel={novel}
-          handleFollowNovel={
-            isLoading
-              ? showNotAvailable
-              : () => {
-                  followNovel();
-                  if (
-                    novel.inLibrary &&
-                    chapters.some(chapter => chapter.isDownloaded)
-                  ) {
-                    deleteDownloadsSnackbar.setTrue();
-                  }
-                }
-          }
-          handleTrackerSheet={() => trackerSheetRef.current?.present()}
+          handleFollowNovel={handleFollowNovel}
+          handleTrackerSheet={handleTrackerSheet}
           theme={theme}
         />
         {isLoading && (!novel.genres || !novel.summary) ? (
@@ -229,23 +308,23 @@ const NovelInfoHeader = ({
           <View style={styles.bottomsheetContainer}>
             <Pressable
               style={styles.bottomsheet}
-              onPress={() => novelBottomSheetRef.current?.present()}
-              android_ripple={{
-                color: color(theme.primary).alpha(0.12).string(),
-              }}
+              onPress={handleOpenBottomSheet}
+              android_ripple={ripple}
             >
               <View style={styles.flex}>
-                <Text style={[{ color: theme.onSurface }, styles.chapters]}>
-                  {!fetching || totalChapters !== undefined
-                    ? `${totalChapters} ${getString('novelScreen.chapters')}`
-                    : getString('common.loading')}
-                </Text>
+                {fetching && totalChapters === undefined ? (
+                  <ChapterCountSkeleton theme={theme} />
+                ) : (
+                  <Text style={[{ color: theme.onSurface }, styles.chapters]}>
+                    {`${totalChapters} ${getString('novelScreen.chapters')}`}
+                  </Text>
+                )}
               </View>
               <IconButton
                 icon="filter-variant"
                 iconColor={filter ? filterColor(theme.isDark) : theme.onSurface}
                 size={24}
-                onPress={() => novelBottomSheetRef.current?.present()}
+                onPress={handleOpenBottomSheet}
               />
             </Pressable>
           </View>
@@ -267,6 +346,19 @@ const styles = StyleSheet.create({
   },
   bottomsheetContainer: {
     gap: 12,
+  },
+  chapterCountGradient: {
+    height: 20,
+    position: 'absolute',
+    transform: [{ translateX: '-100%' }],
+    width: '60%',
+  },
+  chapterCountSkeleton: {
+    borderRadius: 4,
+    height: 14,
+    marginHorizontal: 16,
+    overflow: 'hidden',
+    width: 120,
   },
   chapters: {
     fontSize: 14,

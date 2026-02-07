@@ -130,8 +130,9 @@ export const useNovel = (novelOrPath: string | NovelInfo, pluginId: string) => {
     (index: number, update: Partial<ChapterInfo>) => {
       if (novel) {
         _setChapters(chs => {
-          chs[index] = { ...chs[index], ...update };
-          return chs;
+          const next = [...chs];
+          next[index] = { ...next[index], ...update };
+          return next;
         });
       }
     },

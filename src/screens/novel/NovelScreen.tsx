@@ -63,15 +63,6 @@ const Novel = ({ route, navigation }: NovelScreenProps) => {
 
   const headerOpacity = useSharedValue(0);
 
-  // TODO: fix this
-  // useEffect(() => {
-  //   if (chapters.length !== 0 && !fetching) {
-  //     refreshChapters();
-  //   }
-  // }, [chapters.length, downloadQueue.length, fetching, refreshChapters]);
-
-  // useFocusEffect(refreshChapters);
-
   const downloadChs = useCallback(
     async (amount: number | 'all' | 'unread') => {
       if (!novel) {
@@ -106,17 +97,19 @@ const Novel = ({ route, navigation }: NovelScreenProps) => {
     },
     [chapters, downloadChapters, novel],
   );
+
   const deleteChs = useCallback(() => {
     deleteChapters(chapters.filter(c => c.isDownloaded));
   }, [chapters, deleteChapters]);
-  const shareNovel = () => {
+
+  const shareNovel = useCallback(() => {
     if (!novel) {
       return;
     }
     Share.share({
       message: resolveUrl(novel.pluginId, novel.path, true),
     });
-  };
+  }, [novel]);
 
   const [jumpToChapterModal, showJumpToChapterModal] = useState(false);
   const {
@@ -218,7 +211,7 @@ const Novel = ({ route, navigation }: NovelScreenProps) => {
     selected,
   ]);
 
-  const setCustomNovelCover = async () => {
+  const setCustomNovelCover = useCallback(async () => {
     if (!novel) {
       return;
     }
@@ -229,12 +222,58 @@ const Novel = ({ route, navigation }: NovelScreenProps) => {
         cover: newCover,
       });
     }
-  };
+  }, [novel, setNovel]);
+
+  const stableGetNextBatch = useMemo(
+    () =>
+      batchInformation.batch < batchInformation.total && !fetching
+        ? getNextChapterBatch
+        : noop,
+    [batchInformation.batch, batchInformation.total, fetching, getNextChapterBatch],
+  );
+
+  const hideJumpToChapterModal = useCallback(
+    () => showJumpToChapterModal(false),
+    [],
+  );
+  const hideEditInfoModal = useCallback(
+    () => showEditInfoModal(false),
+    [],
+  );
+  const clearSelection = useCallback(() => setSelected([]), []);
+  const selectAll = useCallback(() => setSelected(chapters), [chapters]);
+
+  const snackbarTheme = useMemo(
+    () => ({ colors: { primary: theme.primary } }),
+    [theme.primary],
+  );
+  const snackbarTextStyle = useMemo(
+    () => ({ color: theme.onSurface }),
+    [theme.onSurface],
+  );
+  const titleStyle = useMemo(
+    () => ({ color: theme.onSurface }),
+    [theme.onSurface],
+  );
+  const snackbarAction = useMemo(
+    () => ({
+      label: getString('common.delete'),
+      onPress: () => {
+        deleteChapters(chapters.filter(c => c.isDownloaded));
+      },
+    }),
+    [chapters, deleteChapters],
+  );
+
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const containerStyle = useMemo(
+    () => [styles.container, { backgroundColor: theme.background }],
+    [styles.container, theme.background],
+  );
 
   return (
     <Portal.Host>
-      <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={containerStyle}>
         <Portal>
           {selected.length === 0 ? (
             <NovelAppbar
@@ -260,18 +299,16 @@ const Novel = ({ route, navigation }: NovelScreenProps) => {
               <Appbar.Action
                 icon="close"
                 iconColor={theme.onBackground}
-                onPress={() => setSelected([])}
+                onPress={clearSelection}
               />
               <Appbar.Content
                 title={`${selected.length}`}
-                titleStyle={{ color: theme.onSurface }}
+                titleStyle={titleStyle}
               />
               <Appbar.Action
                 icon="select-all"
                 iconColor={theme.onBackground}
-                onPress={() => {
-                  setSelected(chapters);
-                }}
+                onPress={selectAll}
               />
             </Animated.View>
           )}
@@ -285,11 +322,7 @@ const Novel = ({ route, navigation }: NovelScreenProps) => {
               routeBaseNovel={route.params}
               selected={selected}
               setSelected={setSelected}
-              getNextChapterBatch={
-                batchInformation.batch < batchInformation.total && !fetching
-                  ? getNextChapterBatch
-                  : noop
-              }
+              getNextChapterBatch={stableGetNextBatch}
             />
           </Suspense>
         </SafeAreaView>
@@ -299,26 +332,21 @@ const Novel = ({ route, navigation }: NovelScreenProps) => {
           <Snackbar
             visible={deleteDownloadsSnackbar.value}
             onDismiss={deleteDownloadsSnackbar.setFalse}
-            action={{
-              label: getString('common.delete'),
-              onPress: () => {
-                deleteChapters(chapters.filter(c => c.isDownloaded));
-              },
-            }}
-            theme={{ colors: { primary: theme.primary } }}
+            action={snackbarAction}
+            theme={snackbarTheme}
             style={styles.snackbar}
           >
-            <Text style={{ color: theme.onSurface }}>
+            <Text style={snackbarTextStyle}>
               {getString('novelScreen.deleteMessage')}
             </Text>
           </Snackbar>
         </Portal>
         <Portal>
-          {novel && (
+          {novel ? (
             <>
               <JumpToChapterModal
                 modalVisible={jumpToChapterModal}
-                hideModal={() => showJumpToChapterModal(false)}
+                hideModal={hideJumpToChapterModal}
                 novel={novel}
                 chapterListRef={chapterListRef}
                 navigation={navigation}
@@ -328,7 +356,7 @@ const Novel = ({ route, navigation }: NovelScreenProps) => {
               />
               <EditInfoModal
                 modalVisible={editInfoModal}
-                hideModal={() => showEditInfoModal(false)}
+                hideModal={hideEditInfoModal}
                 novel={novel}
                 setNovel={setNovel}
                 theme={theme}
@@ -342,7 +370,7 @@ const Novel = ({ route, navigation }: NovelScreenProps) => {
                 downloadChapters={downloadChapters}
               />
             </>
-          )}
+          ) : null}
         </Portal>
       </View>
     </Portal.Host>

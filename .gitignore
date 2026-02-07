@@ -90,3 +90,5 @@ flake.lock
 .pnpm-store
 
 .cursor/
+.agents/
+.claude/
