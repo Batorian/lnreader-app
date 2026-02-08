@@ -82,7 +82,7 @@ const Searchbar: React.FC<SearcbarProps> = ({
           ref={searchbarRef}
           style={[styles.textInput, { color: theme.onSurface }]}
           placeholder={placeholder}
-          placeholderTextColor={theme.onSurface}
+          placeholderTextColor={theme.onSurfaceVariant}
           onChangeText={onChangeText}
           onSubmitEditing={onSubmitEditing}
           defaultValue={searchText}
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   searchbarContainer: {
-    borderRadius: 50,
+    borderRadius: 28,
     marginBottom: 12,
     marginHorizontal: 16,
     minHeight: 56,

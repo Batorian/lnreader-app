@@ -2,7 +2,6 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ThemeColors } from '../../theme/types';
-import { overlay } from 'react-native-paper';
 
 interface ChipProps {
   label: string;
@@ -14,9 +13,7 @@ const Chip: React.FC<ChipProps> = ({ label, theme }) => (
     style={[
       styles.chipContainer,
       {
-        backgroundColor: theme.isDark
-          ? overlay(1, theme.surface)
-          : theme.secondaryContainer,
+        backgroundColor: theme.secondaryContainer,
       },
     ]}
   >
@@ -28,7 +25,7 @@ const Chip: React.FC<ChipProps> = ({ label, theme }) => (
         style={[
           styles.label,
           {
-            color: theme.isDark ? theme.onSurface : theme.onSecondaryContainer,
+            color: theme.onSecondaryContainer,
           },
         ]}
       >
@@ -48,7 +45,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   label: {
-    fontSize: 12,
+    fontSize: 14,
   },
   pressable: {
     alignItems: 'center',

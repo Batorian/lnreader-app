@@ -100,7 +100,7 @@ function CustomBottomTabBar({
                   transitionDuration: 250,
                   transitionTimingFunction: 'ease-in-out',
                   marginBottom: showLabel ? 4 : 20,
-                  width: isFocused ? 52 : 32,
+                  width: isFocused ? 64 : 32,
                   backgroundColor: isFocused
                     ? theme.primaryContainer
                     : 'transparent',
@@ -116,8 +116,8 @@ function CustomBottomTabBar({
                 style={[
                   styles.label,
                   {
-                    color: theme.onSurfaceVariant,
-                    fontWeight: '700',
+                    color: isFocused ? theme.onSurface : theme.onSurfaceVariant,
+                    fontWeight: '500',
                   },
                 ]}
                 numberOfLines={1}
@@ -138,7 +138,8 @@ export type { CustomBottomTabBarProps };
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    paddingVertical: 4,
+    paddingTop: 12,
+    paddingBottom: 16,
     paddingHorizontal: 0,
     minHeight: 80,
   },
@@ -154,8 +155,8 @@ const styles = StyleSheet.create({
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 2,
-    borderRadius: 24,
+    height: 32,
+    borderRadius: 16,
   },
   label: {
     height: 16,

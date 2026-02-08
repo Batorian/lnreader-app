@@ -88,7 +88,7 @@ export function SegmentedControl<T extends string = string>({
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    height: 48,
+    height: 40,
   },
   segment: {
     flex: 1,
@@ -99,16 +99,16 @@ const styles = StyleSheet.create({
   segmentFirst: {
     borderLeftWidth: 1,
     borderRightWidth: 1,
-    borderTopLeftRadius: 24,
-    borderBottomLeftRadius: 24,
+    borderTopLeftRadius: 20,
+    borderBottomLeftRadius: 20,
   },
   segmentMiddle: {
     borderRightWidth: 1,
   },
   segmentLast: {
     borderRightWidth: 1,
-    borderTopRightRadius: 24,
-    borderBottomRightRadius: 24,
+    borderTopRightRadius: 20,
+    borderBottomRightRadius: 20,
   },
   segmentPressable: {
     flex: 1,

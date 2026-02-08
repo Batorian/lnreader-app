@@ -65,7 +65,7 @@ const styles = StyleSheet.create({
     shadowColor: 'transparent',
   },
   content: {
-    fontSize: 16,
+    fontSize: 14,
     letterSpacing: 0,
   },
 });

@@ -16,7 +16,6 @@ const ReaderSheetPreferenceItem: React.FC<ReaderSheetPreferenceItemProps> = ({
   onPress,
   theme,
 }) => {
-  const size = 20;
   return (
     <Pressable
       style={styles.container}
@@ -30,14 +29,14 @@ const ReaderSheetPreferenceItem: React.FC<ReaderSheetPreferenceItemProps> = ({
         fallback={
           <View
             style={{
-              width: size * 2 + size / 6,
-              height: size + size / 3,
-              borderRadius: size,
+              width: 52,
+              height: 32,
+              borderRadius: 16,
             }}
           />
         }
       >
-        <Switch value={value} onValueChange={onPress} size={size} />
+        <Switch value={value} onValueChange={onPress} />
       </Suspense>
     </Pressable>
   );

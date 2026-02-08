@@ -227,14 +227,12 @@ const JumpToChapterModal = ({
             value={openChapter}
             theme={theme}
             onPress={() => setOpenChapter(!openChapter)}
-            size={20}
           />
           <SwitchItem
             label={getString('novelScreen.jumpToChapterModal.chapterName')}
             value={mode}
             theme={theme}
             onPress={() => setMode(!mode)}
-            size={20}
           />
         </View>
         {result.length ? (

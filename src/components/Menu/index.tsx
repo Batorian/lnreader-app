@@ -173,7 +173,7 @@ const Menu: React.FC<MenuProps> & { Item: React.FC<MenuItemProps> } = ({
             key={menuLayout ? 'ready' : 'measuring'}
             style={[
               styles.menuContainer,
-              { backgroundColor: theme.surface },
+              { backgroundColor: theme.surface2 || theme.surface },
               contentStyle,
               menuPosition,
             ]}
@@ -220,14 +220,14 @@ Menu.Item = MenuItem;
 
 const styles = StyleSheet.create({
   menuContainer: {
-    borderRadius: 8,
-    elevation: 8,
+    borderRadius: 4,
+    elevation: 2,
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 1,
     },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
     overflow: 'hidden',
     position: 'absolute',
     zIndex: 1001,
@@ -246,7 +246,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.1)',
   },
   menuItem: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 12,
     minHeight: 48,
     justifyContent: 'center',

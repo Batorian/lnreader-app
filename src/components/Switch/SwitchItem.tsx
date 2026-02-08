@@ -16,7 +16,6 @@ interface SwitchItemProps {
   description?: string;
   onPress: () => void;
   theme: ThemeColors;
-  size?: number;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -26,7 +25,6 @@ const SwitchItem: React.FC<SwitchItemProps> = ({
   onPress,
   theme,
   value,
-  size,
   style,
 }) => (
   <Pressable
@@ -46,7 +44,6 @@ const SwitchItem: React.FC<SwitchItemProps> = ({
       value={value}
       onValueChange={onPress}
       style={styles.switch}
-      size={size}
     />
   </Pressable>
 );
@@ -58,10 +55,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
+    paddingHorizontal: 16,
     paddingVertical: 12,
   },
   description: {
-    fontSize: 12,
+    fontSize: 14,
     lineHeight: 20,
   },
   label: {

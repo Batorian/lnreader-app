@@ -33,7 +33,7 @@ const SubHeader = ({
   children: ReactNode;
   theme: ThemeColors;
 }) => (
-  <PaperList.Subheader style={{ color: theme.primary }}>
+  <PaperList.Subheader style={{ color: theme.onSurfaceVariant }}>
     {children}
   </PaperList.Subheader>
 );
@@ -51,13 +51,13 @@ const Item: React.FC<ListItemProps> = ({
     if (icon) {
       return (
         <PaperList.Icon
-          color={theme.primary}
+          color={theme.onSurfaceVariant}
           icon={icon}
           style={styles.iconCtn}
         />
       );
     }
-  }, [icon, theme.primary]);
+  }, [icon, theme.onSurfaceVariant]);
   const rightIcon = useCallback(() => {
     if (right) {
       return (
@@ -68,7 +68,7 @@ const Item: React.FC<ListItemProps> = ({
         />
       );
     }
-  }, [right, theme.primary]);
+  }, [right, theme.onSurfaceVariant]);
   return (
     <PaperList.Item
       title={title}
@@ -93,7 +93,9 @@ const Item: React.FC<ListItemProps> = ({
 };
 
 const Divider = ({ theme }: { theme: ThemeColors }) => (
-  <PaperDivider style={[styles.divider, { backgroundColor: theme.outline }]} />
+  <PaperDivider
+    style={[styles.divider, { backgroundColor: theme.outlineVariant }]}
+  />
 );
 
 const InfoItem = ({
@@ -119,7 +121,11 @@ const InfoItem = ({
 );
 
 const Icon = ({ icon, theme }: { icon: string; theme: ThemeColors }) => (
-  <PaperList.Icon color={theme.primary} icon={icon} style={styles.margin0} />
+  <PaperList.Icon
+    color={theme.onSurfaceVariant}
+    icon={icon}
+    style={styles.margin0}
+  />
 );
 
 interface ColorItemProps {
@@ -174,12 +180,11 @@ const styles = StyleSheet.create({
     marginEnd: 16,
   },
   description: {
-    fontSize: 12,
+    fontSize: 14,
     lineHeight: 20,
   },
   divider: {
     height: 1,
-    opacity: 0.5,
   },
   iconCtn: {
     paddingStart: 16,
