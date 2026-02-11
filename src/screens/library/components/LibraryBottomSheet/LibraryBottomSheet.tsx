@@ -177,6 +177,12 @@ const ThirdRoute = () => {
   );
 };
 
+const bottomSheetSceneMap = SceneMap({
+  first: FirstRoute,
+  second: SecondRoute,
+  third: ThirdRoute,
+});
+
 const LibraryBottomSheet: React.FC<LibraryBottomSheetProps> = ({
   bottomSheetRef,
   style,
@@ -185,24 +191,40 @@ const LibraryBottomSheet: React.FC<LibraryBottomSheetProps> = ({
 
   const layout = useWindowDimensions();
 
-  const renderTabBar = (props: any) => (
-    <TabBar
-      {...props}
-      indicatorStyle={{ backgroundColor: theme.primary }}
-      style={[
-        {
-          backgroundColor: overlay(2, theme.surface),
-          borderBottomColor: color(theme.isDark ? '#FFFFFF' : '#000000')
-            .alpha(0.12)
-            .string(),
-        },
-        styles.tabBar,
-        style,
-      ]}
-      inactiveColor={theme.onSurfaceVariant}
-      activeColor={theme.primary}
-      pressColor={color(theme.primary).alpha(0.12).string()}
-    />
+  const borderBottomColor = useMemo(
+    () =>
+      color(theme.isDark ? '#FFFFFF' : '#000000')
+        .alpha(0.12)
+        .string(),
+    [theme.isDark],
+  );
+
+  const renderTabBar = useCallback(
+    (props: any) => (
+      <TabBar
+        {...props}
+        indicatorStyle={{ backgroundColor: theme.primary }}
+        style={[
+          {
+            backgroundColor: overlay(2, theme.surface),
+            borderBottomColor,
+          },
+          styles.tabBar,
+          style,
+        ]}
+        inactiveColor={theme.onSurfaceVariant}
+        activeColor={theme.primary}
+        pressColor={theme.rippleColor}
+      />
+    ),
+    [
+      theme.primary,
+      theme.surface,
+      theme.onSurfaceVariant,
+      theme.rippleColor,
+      borderBottomColor,
+      style,
+    ],
   );
 
   const [index, setIndex] = useState(0);
@@ -214,12 +236,6 @@ const LibraryBottomSheet: React.FC<LibraryBottomSheetProps> = ({
     ],
     [],
   );
-
-  const renderScene = SceneMap({
-    first: FirstRoute,
-    second: SecondRoute,
-    third: ThirdRoute,
-  });
 
   const renderCommonOptions = useCallback(
     ({ route, color: col }: { route: any; color: string }) => (
@@ -249,7 +265,7 @@ const LibraryBottomSheet: React.FC<LibraryBottomSheetProps> = ({
           commonOptions={commonOptions}
           navigationState={{ index, routes }}
           renderTabBar={renderTabBar}
-          renderScene={renderScene}
+          renderScene={bottomSheetSceneMap}
           onIndexChange={setIndex}
           initialLayout={{ width: layout.width }}
           style={styles.tabView}

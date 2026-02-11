@@ -62,7 +62,8 @@ interface INovelCover<TNovel> {
   addSkeletonLoading?: boolean;
   inActivity?: boolean;
   onLongPress: (item: TNovel) => void;
-  selectedNovelIds: number[];
+  hasSelection?: boolean;
+  selectedNovelIds?: number[];
   globalSearch?: boolean;
   imageRequestInit?: ImageRequestInit;
 }
@@ -84,10 +85,13 @@ function NovelCover<
   addSkeletonLoading,
   inActivity,
   onLongPress,
+  hasSelection,
   globalSearch,
   selectedNovelIds,
   imageRequestInit,
 }: INovelCover<TNovel>) {
+  const selectionActive =
+    hasSelection ?? (selectedNovelIds != null && selectedNovelIds.length > 0);
   const {
     displayMode = DisplayModes.Comfortable,
     showDownloadBadges = true,
@@ -162,7 +166,7 @@ function NovelCover<
         android_ripple={{ color: theme.rippleColor }}
         style={styles.opac}
         onPress={
-          selectedNovelIds && selectedNovelIds.length > 0
+          selectionActive
             ? selectNovel
             : onPress
         }
@@ -243,7 +247,7 @@ function NovelCover<
       inLibraryBadge={libraryStatus && <InLibraryBadge theme={theme} />}
       theme={theme}
       onPress={
-        selectedNovelIds && selectedNovelIds.length > 0 ? selectNovel : onPress
+        selectionActive ? selectNovel : onPress
       }
       onLongPress={selectNovel}
       isSelected={isSelected}

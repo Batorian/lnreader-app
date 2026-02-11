@@ -143,7 +143,7 @@ const BrowseSourceScreen = ({ route, navigation }: BrowseSourceScreenProps) => {
 
                   setInActivity(prev => ({ ...prev, [item.path]: false }));
                 }}
-                selectedNovelIds={[]}
+                hasSelection={false}
                 imageRequestInit={imageRequestInit}
               />
             );

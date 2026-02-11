@@ -152,7 +152,7 @@ const GlobalSearchSourceResults: React.FC<{ item: GlobalSearchResult }> = ({
                         [novelItem.path]: false,
                       }));
                     }}
-                    selectedNovelIds={[]}
+                    hasSelection={false}
                     isSelected={false}
                     imageRequestInit={imageRequestInit}
                   />

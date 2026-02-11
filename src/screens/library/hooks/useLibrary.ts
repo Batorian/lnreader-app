@@ -78,12 +78,18 @@ export const useLibrary = (): UseLibraryReturnType => {
     setIsLoading(false);
   }, [downloadedOnlyMode, filter, refreshCategories, searchText, sortOrder]);
 
+  const libraryLookup = useMemo(() => {
+    const set = new Set<string>();
+    for (const novel of library) {
+      set.add(`${novel.pluginId}::${novel.path}`);
+    }
+    return set;
+  }, [library]);
+
   const novelInLibrary = useCallback(
     (pluginId: string, novelPath: string) =>
-      library?.some(
-        novel => novel.pluginId === pluginId && novel.path === novelPath,
-      ),
-    [library],
+      libraryLookup.has(`${pluginId}::${novelPath}`),
+    [libraryLookup],
   );
 
   const switchNovelToLibrary = useCallback(

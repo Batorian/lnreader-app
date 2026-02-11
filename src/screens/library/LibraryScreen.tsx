@@ -48,6 +48,8 @@ import ServiceManager from '@services/ServiceManager';
 import useImport from '@hooks/persisted/useImport';
 import { ThemeColors } from '@theme/types';
 import { useLibraryContext } from '@components/Context/LibraryContext';
+import { xor } from 'lodash-es';
+import { SelectionContext } from './SelectionContext';
 
 type State = NavigationState<{
   key: string;
@@ -73,7 +75,7 @@ type TabViewLabelProps = {
 const LibraryScreen = ({ navigation }: LibraryScreenProps) => {
   const { searchText, setSearchText, clearSearchbar } = useSearch();
   const theme = useTheme();
-  const styles = createStyles(theme);
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const { left: leftInset, right: rightInset } = useSafeAreaInsets();
   const {
     library,
@@ -100,17 +102,28 @@ const LibraryScreen = ({ navigation }: LibraryScreenProps) => {
     setFalse: closeSetCategoryModal,
   } = useBoolean();
 
-  const handleClearSearchbar = () => {
-    clearSearchbar();
-  };
-
   const [selectedNovelIds, setSelectedNovelIds] = useState<number[]>([]);
+
+  const selectedIdsSet = useMemo(
+    () => new Set(selectedNovelIds),
+    [selectedNovelIds],
+  );
+  const hasSelection = selectedNovelIds.length > 0;
+
+  const toggleSelection = useCallback(
+    (id: number) => setSelectedNovelIds(prev => xor(prev, [id])),
+    [],
+  );
+
+  const selectionContextValue = useMemo(
+    () => ({ selectedIdsSet, hasSelection, toggleSelection, setSelectedNovelIds }),
+    [selectedIdsSet, hasSelection, toggleSelection],
+  );
 
   const currentNovels = useMemo(() => {
     if (!categories.length) return [];
-
-    const ids = categories[index].novelIds;
-    return library.filter(l => ids.includes(l.id));
+    const idsSet = new Set(categories[index].novelIds);
+    return library.filter(l => idsSet.has(l.id));
   }, [categories, index, library]);
 
   useBackHandler(() => {
@@ -139,16 +152,16 @@ const LibraryScreen = ({ navigation }: LibraryScreenProps) => {
       ? getString('libraryScreen.searchbar')
       : `${selectedNovelIds.length} selected`;
 
-  function openRandom() {
-    const novels = currentNovels;
-    const randomNovel = novels[Math.floor(Math.random() * novels.length)];
+  const openRandom = useCallback(() => {
+    const randomNovel =
+      currentNovels[Math.floor(Math.random() * currentNovels.length)];
     if (randomNovel) {
       navigation.navigate('ReaderStack', {
         screen: 'Novel',
         params: randomNovel,
       });
     }
-  }
+  }, [currentNovels, navigation]);
 
   const pickAndImport = useCallback(() => {
     DocumentPicker.getDocumentAsync({
@@ -157,6 +170,16 @@ const LibraryScreen = ({ navigation }: LibraryScreenProps) => {
       multiple: true,
     }).then(importNovel);
   }, [importNovel]);
+
+  const searchLower = useMemo(() => searchText.toLowerCase(), [searchText]);
+
+  const tabBarBorderColor = useMemo(
+    () =>
+      Color(theme.isDark ? '#FFFFFF' : '#000000')
+        .alpha(0.12)
+        .string(),
+    [theme.isDark],
+  );
 
   const renderTabBar = useCallback(
     (props: SceneRendererProps & { navigationState: State }) => {
@@ -168,9 +191,7 @@ const LibraryScreen = ({ navigation }: LibraryScreenProps) => {
           style={[
             {
               backgroundColor: theme.surface,
-              borderBottomColor: Color(theme.isDark ? '#FFFFFF' : '#000000')
-                .alpha(0.12)
-                .string(),
+              borderBottomColor: tabBarBorderColor,
             },
             styles.tabBar,
           ]}
@@ -187,7 +208,7 @@ const LibraryScreen = ({ navigation }: LibraryScreenProps) => {
       styles.tabBar,
       styles.tabBarIndicator,
       styles.tabStyle,
-      theme.isDark,
+      tabBarBorderColor,
       theme.primary,
       theme.rippleColor,
       theme.secondary,
@@ -207,14 +228,16 @@ const LibraryScreen = ({ navigation }: LibraryScreenProps) => {
         title: string;
       };
     }) => {
-      const ids = route.novelIds;
-      const unfilteredNovels = library.filter(l => ids.includes(l.id));
+      const idsSet = new Set(route.novelIds);
+      const unfilteredNovels = library.filter(l => idsSet.has(l.id));
 
-      const novels = unfilteredNovels.filter(
-        n =>
-          n.name.toLowerCase().includes(searchText.toLowerCase()) ||
-          (n.author?.toLowerCase().includes(searchText.toLowerCase()) ?? false),
-      );
+      const novels = searchLower
+        ? unfilteredNovels.filter(
+            n =>
+              n.name.toLowerCase().includes(searchLower) ||
+              (n.author?.toLowerCase().includes(searchLower) ?? false),
+          )
+        : unfilteredNovels;
 
       return isLoading ? (
         <SourceScreenSkeletonLoading theme={theme} />
@@ -237,8 +260,6 @@ const LibraryScreen = ({ navigation }: LibraryScreenProps) => {
             categoryId={route.id}
             categoryName={route.name}
             novels={novels}
-            selectedNovelIds={selectedNovelIds}
-            setSelectedNovelIds={setSelectedNovelIds}
             pickAndImport={pickAndImport}
             navigation={navigation}
           />
@@ -251,7 +272,7 @@ const LibraryScreen = ({ navigation }: LibraryScreenProps) => {
       navigation,
       pickAndImport,
       searchText,
-      selectedNovelIds,
+      searchLower,
       styles.globalSearchBtn,
       theme,
     ],
@@ -289,6 +310,126 @@ const LibraryScreen = ({ navigation }: LibraryScreenProps) => {
     ],
   );
 
+  const handleLeftIconPress = useCallback(() => {
+    if (selectedNovelIds.length > 0) {
+      setSelectedNovelIds([]);
+    }
+  }, [selectedNovelIds.length]);
+
+  const rightIcons = useMemo(
+    () =>
+      selectedNovelIds.length
+        ? [
+            {
+              iconName: 'select-all' as const,
+              onPress: () =>
+                setSelectedNovelIds(currentNovels.map(novel => novel.id)),
+            },
+          ]
+        : [
+            {
+              iconName: 'filter-variant' as const,
+              onPress: () => bottomSheetRef.current?.present(),
+            },
+          ],
+    [selectedNovelIds.length, currentNovels],
+  );
+
+  const menuButtons = useMemo(
+    () => [
+      {
+        title: getString('libraryScreen.extraMenu.updateLibrary'),
+        onPress: () =>
+          ServiceManager.manager.addTask({ name: 'UPDATE_LIBRARY' }),
+      },
+      {
+        title: getString('libraryScreen.extraMenu.updateCategory'),
+        onPress: () =>
+          categories[index]?.id !== 2 &&
+          ServiceManager.manager.addTask({
+            name: 'UPDATE_LIBRARY',
+            data: {
+              categoryId: categories[index].id,
+              categoryName: categories[index].name,
+            },
+          }),
+      },
+      {
+        title: getString('libraryScreen.extraMenu.importEpub'),
+        onPress: pickAndImport,
+      },
+      {
+        title: getString('libraryScreen.extraMenu.openRandom'),
+        onPress: openRandom,
+      },
+    ],
+    [categories, index, pickAndImport, openRandom],
+  );
+
+  const handleFABPress = useCallback(() => {
+    if (history?.[0]) {
+      navigation.navigate('ReaderStack', {
+        screen: 'Chapter',
+        params: {
+          novel: {
+            path: history[0].novelPath,
+            pluginId: history[0].pluginId,
+            name: history[0].novelName,
+          } as NovelInfo,
+          chapter: history[0],
+        },
+      });
+    }
+  }, [history, navigation]);
+
+  const handleEditCategories = useCallback(
+    () => setSelectedNovelIds([]),
+    [],
+  );
+
+  const handleCategorySuccess = useCallback(() => {
+    setSelectedNovelIds([]);
+    refetchLibrary();
+  }, [refetchLibrary]);
+
+  const bottomSheetStyle = useMemo(
+    () => ({ marginStart: leftInset, marginEnd: rightInset }),
+    [leftInset, rightInset],
+  );
+
+  const actionbarViewStyle = useMemo(
+    () => ({ paddingStart: leftInset, paddingEnd: rightInset }),
+    [leftInset, rightInset],
+  );
+
+  const markAllRead = useCallback(async () => {
+    await Promise.all(selectedNovelIds.map(id => markAllChaptersRead(id)));
+    setSelectedNovelIds([]);
+    refetchLibrary();
+  }, [selectedNovelIds, refetchLibrary]);
+
+  const markAllUnread = useCallback(async () => {
+    await Promise.all(selectedNovelIds.map(id => markAllChaptersUnread(id)));
+    setSelectedNovelIds([]);
+    refetchLibrary();
+  }, [selectedNovelIds, refetchLibrary]);
+
+  const deleteSelected = useCallback(async () => {
+    await removeNovelsFromLibrary(selectedNovelIds);
+    setSelectedNovelIds([]);
+    refetchLibrary();
+  }, [selectedNovelIds, refetchLibrary]);
+
+  const actionbarActions = useMemo(
+    () => [
+      { icon: 'label-outline' as const, onPress: showSetCategoryModal },
+      { icon: 'check' as const, onPress: markAllRead },
+      { icon: 'check-outline' as const, onPress: markAllUnread },
+      { icon: 'delete-outline' as const, onPress: deleteSelected },
+    ],
+    [showSetCategoryModal, markAllRead, markAllUnread, deleteSelected],
+  );
+
   const navigationState = useMemo(
     () => ({
       index,
@@ -305,61 +446,13 @@ const LibraryScreen = ({ navigation }: LibraryScreenProps) => {
     <SafeAreaView excludeBottom>
       <SearchbarV2
         searchText={searchText}
-        clearSearchbar={handleClearSearchbar}
+        clearSearchbar={clearSearchbar}
         placeholder={searchbarPlaceholder}
-        onLeftIconPress={() => {
-          if (selectedNovelIds.length > 0) {
-            setSelectedNovelIds([]);
-          }
-        }}
+        onLeftIconPress={handleLeftIconPress}
         onChangeText={setSearchText}
         leftIcon={selectedNovelIds.length ? 'close' : 'magnify'}
-        rightIcons={
-          selectedNovelIds.length
-            ? [
-              {
-                iconName: 'select-all',
-                onPress: () =>
-                  setSelectedNovelIds(currentNovels.map(novel => novel.id)),
-              },
-            ]
-            : [
-              {
-                iconName: 'filter-variant',
-                onPress: () => bottomSheetRef.current?.present(),
-              },
-            ]
-        }
-        menuButtons={[
-          {
-            title: getString('libraryScreen.extraMenu.updateLibrary'),
-            onPress: () =>
-              ServiceManager.manager.addTask({
-                name: 'UPDATE_LIBRARY',
-              }),
-          },
-          {
-            title: getString('libraryScreen.extraMenu.updateCategory'),
-            onPress: () =>
-              //2 = local category
-              library[index].id !== 2 &&
-              ServiceManager.manager.addTask({
-                name: 'UPDATE_LIBRARY',
-                data: {
-                  categoryId: library[index].id,
-                  categoryName: library[index].name,
-                },
-              }),
-          },
-          {
-            title: getString('libraryScreen.extraMenu.importEpub'),
-            onPress: pickAndImport,
-          },
-          {
-            title: getString('libraryScreen.extraMenu.openRandom'),
-            onPress: openRandom,
-          },
-        ]}
+        rightIcons={rightIcons}
+        menuButtons={menuButtons}
         theme={theme}
       />
       {downloadedOnlyMode ? (
@@ -379,17 +472,19 @@ const LibraryScreen = ({ navigation }: LibraryScreenProps) => {
         />
       ) : null}
 
-      <TabView
-        commonOptions={{
-          label: renderLabel,
-        }}
-        lazy
-        navigationState={navigationState}
-        renderTabBar={renderTabBar}
-        renderScene={renderScene}
-        onIndexChange={setIndex}
-        initialLayout={{ width: layout.width }}
-      />
+      <SelectionContext.Provider value={selectionContextValue}>
+        <TabView
+          commonOptions={{
+            label: renderLabel,
+          }}
+          lazy
+          navigationState={navigationState}
+          renderTabBar={renderTabBar}
+          renderScene={renderScene}
+          onIndexChange={setIndex}
+          initialLayout={{ width: layout.width }}
+        />
+      </SelectionContext.Provider>
 
       {useLibraryFAB &&
         !isHistoryLoading &&
@@ -405,77 +500,25 @@ const LibraryScreen = ({ navigation }: LibraryScreenProps) => {
           uppercase={false}
           label={getString('common.resume')}
           icon="play"
-          onPress={() => {
-            navigation.navigate('ReaderStack', {
-              screen: 'Chapter',
-              params: {
-                novel: {
-                  path: history[0].novelPath,
-                  pluginId: history[0].pluginId,
-                  name: history[0].novelName,
-                } as NovelInfo,
-                chapter: history[0],
-              },
-            });
-          }}
+          onPress={handleFABPress}
         />
       ) : null}
       <SetCategoryModal
         novelIds={selectedNovelIds}
         closeModal={closeSetCategoryModal}
-        onEditCategories={() => setSelectedNovelIds([])}
+        onEditCategories={handleEditCategories}
         visible={setCategoryModalVisible}
-        onSuccess={() => {
-          setSelectedNovelIds([]);
-          refetchLibrary();
-        }}
+        onSuccess={handleCategorySuccess}
       />
       <LibraryBottomSheet
         bottomSheetRef={bottomSheetRef}
-        style={{ marginStart: leftInset, marginEnd: rightInset }}
+        style={bottomSheetStyle}
       />
       <Portal>
         <Actionbar
-          viewStyle={{ paddingStart: leftInset, paddingEnd: rightInset }}
-          active={selectedNovelIds.length > 0}
-          actions={[
-            {
-              icon: 'label-outline',
-              onPress: showSetCategoryModal,
-            },
-            {
-              icon: 'check',
-              onPress: async () => {
-                const promises: Promise<any>[] = [];
-                selectedNovelIds.map(id =>
-                  promises.push(markAllChaptersRead(id)),
-                );
-                await Promise.all(promises);
-                setSelectedNovelIds([]);
-                refetchLibrary();
-              },
-            },
-            {
-              icon: 'check-outline',
-              onPress: async () => {
-                const promises: Promise<any>[] = [];
-                selectedNovelIds.map(id =>
-                  promises.push(markAllChaptersUnread(id)),
-                );
-                await Promise.all(promises);
-                setSelectedNovelIds([]);
-                refetchLibrary();
-              },
-            },
-            {
-              icon: 'delete-outline',
-              onPress: async () => {
-                await removeNovelsFromLibrary(selectedNovelIds);
-                setSelectedNovelIds([]);
-                refetchLibrary();
-              },
-            },
-          ]}
+          viewStyle={actionbarViewStyle}
+          active={hasSelection}
+          actions={actionbarActions}
         />
       </Portal>
     </SafeAreaView>
