@@ -210,7 +210,7 @@ export const clearUpdates = () =>
 
 export const getCustomPages = (novelId: number) =>
   db.getAllAsync<{ page: string }>(
-    'SELECT DISTINCT page from Chapter WHERE novelId = ?',
+    'SELECT DISTINCT page from Chapter WHERE novelId = ? ORDER BY CAST(page AS INTEGER) ASC',
     novelId,
   );
 
@@ -320,13 +320,13 @@ export const getPrevChapter = (
   page: string,
 ) =>
   db.getFirstAsync<ChapterInfo>(
-    `SELECT * FROM Chapter 
-      WHERE novelId = ? 
+    `SELECT * FROM Chapter
+      WHERE novelId = ?
       AND (
-        (position < ? AND page = ?) 
-        OR page < ?
+        (position < ? AND page = ?)
+        OR CAST(page AS INTEGER) < CAST(? AS INTEGER)
       )
-      ORDER BY position DESC, page DESC`,
+      ORDER BY CAST(page AS INTEGER) DESC, position DESC`,
     novelId,
     chapterPosition,
     page,
@@ -339,13 +339,13 @@ export const getNextChapter = (
   page: string,
 ) =>
   db.getFirstAsync<ChapterInfo>(
-    `SELECT * FROM Chapter 
-      WHERE novelId = ? 
+    `SELECT * FROM Chapter
+      WHERE novelId = ?
       AND (
-        (page = ? AND position > ?)  
-        OR (position = 0 AND page > ?) 
+        (page = ? AND position > ?)
+        OR (position = 0 AND CAST(page AS INTEGER) > CAST(? AS INTEGER))
       )
-      ORDER BY position ASC, page ASC`,
+      ORDER BY CAST(page AS INTEGER) ASC, position ASC`,
     novelId,
     page,
     chapterPosition,
