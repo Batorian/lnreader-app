@@ -325,7 +325,6 @@ const styles = StyleSheet.create({
   },
   novelInfo: {
     fontSize: 14,
-    marginBottom: 4,
   },
   novelInfoContainer: {
     flexDirection: 'row',

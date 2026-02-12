@@ -48,6 +48,8 @@ import Animated, {
 import { LinearGradient } from 'expo-linear-gradient';
 import useLoadingColors from '@components/Skeleton/useLoadingColors';
 
+const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
+
 interface NovelInfoHeaderProps {
   chapters: ChapterInfo[];
   deleteDownloadsSnackbar: UseBooleanReturnType;
@@ -116,7 +118,10 @@ const ChapterCountSkeleton = ({ theme }: { theme: ThemeColors }) => {
 
   return (
     <View
-      style={[styles.chapterCountSkeleton, { backgroundColor: backgroundColor }]}
+      style={[
+        styles.chapterCountSkeleton,
+        { backgroundColor: backgroundColor },
+      ]}
     >
       <LG
         start={[0, 0]}
@@ -125,6 +130,95 @@ const ChapterCountSkeleton = ({ theme }: { theme: ThemeColors }) => {
         style={[animatedProps, styles.chapterCountGradient]}
         colors={['transparent', highlightColor, highlightColor, 'transparent']}
       />
+    </View>
+  );
+};
+
+const useShimmer = (theme: ThemeColors) => {
+  const sv = useSharedValue(0);
+  const { disableLoadingAnimations } = useAppSettings();
+  const [highlightColor, backgroundColor] = useLoadingColors(theme);
+
+  const animatedStyle = useAnimatedProps(() => ({
+    left: (sv.value + '%') as `${number}%`,
+  }));
+
+  React.useEffect(() => {
+    if (disableLoadingAnimations) return;
+    sv.value = withRepeat(
+      withSequence(0, withTiming(160, { duration: 1000 })),
+      -1,
+    );
+  }, [disableLoadingAnimations, sv]);
+
+  return {
+    animatedStyle,
+    highlightColor,
+    backgroundColor,
+    disableLoadingAnimations,
+  };
+};
+
+const NovelDetailsSkeleton = ({ theme }: { theme: ThemeColors }) => {
+  const {
+    animatedStyle,
+    highlightColor,
+    backgroundColor,
+    disableLoadingAnimations,
+  } = useShimmer(theme);
+
+  const shimmer = !disableLoadingAnimations ? (
+    <AnimatedLinearGradient
+      start={[0, 0]}
+      end={[1, 0]}
+      locations={[0, 0.3, 0.7, 1]}
+      style={[animatedStyle, styles.infoSkeletonGradient]}
+      colors={['transparent', highlightColor, highlightColor, 'transparent']}
+    />
+  ) : null;
+
+  return (
+    <>
+      <Row style={styles.infoRow}>
+        <View style={[styles.infoSkeletonBar, { backgroundColor, width: 130 }]}>
+          {shimmer}
+        </View>
+      </Row>
+      <Row style={styles.infoRow}>
+        <View style={[styles.infoSkeletonBar, { backgroundColor, width: 180 }]}>
+          {shimmer}
+        </View>
+      </Row>
+    </>
+  );
+};
+
+const ButtonGroupSkeleton = ({ theme }: { theme: ThemeColors }) => {
+  const {
+    animatedStyle,
+    highlightColor,
+    backgroundColor,
+    disableLoadingAnimations,
+  } = useShimmer(theme);
+
+  const shimmer = !disableLoadingAnimations ? (
+    <AnimatedLinearGradient
+      start={[0, 0]}
+      end={[1, 0]}
+      locations={[0, 0.3, 0.7, 1]}
+      style={[animatedStyle, styles.buttonSkeletonGradient]}
+      colors={['transparent', highlightColor, highlightColor, 'transparent']}
+    />
+  ) : null;
+
+  return (
+    <View style={styles.buttonGroupSkeletonContainer}>
+      <View style={[styles.buttonSkeleton, { backgroundColor }]}>
+        {shimmer}
+      </View>
+      <View style={[styles.buttonSkeleton, { backgroundColor }]}>
+        {shimmer}
+      </View>
     </View>
   );
 };
@@ -227,7 +321,7 @@ const NovelInfoHeader = ({
             saveNovelCover={isLoading ? showNotAvailable : saveNovelCover}
           />
           <View style={styles.novelDetails}>
-            <Row>
+            <Row style={styles.infoRow}>
               <NovelTitle
                 theme={theme}
                 onPress={handleTitlePress}
@@ -236,55 +330,65 @@ const NovelInfoHeader = ({
                 {novel.name}
               </NovelTitle>
             </Row>
-            {novel.id !== 'NO_ID' && novel.author ? (
-              <Row>
-                <MaterialCommunityIcons
-                  name="fountain-pen-tip"
-                  size={14}
-                  color={theme.onSurfaceVariant}
-                  style={styles.marginRight}
-                />
-                <NovelInfo theme={theme}>{novel.author}</NovelInfo>
-              </Row>
-            ) : null}
-            {novel.id !== 'NO_ID' && novel.artist ? (
-              <Row>
-                <MaterialCommunityIcons
-                  name="palette-outline"
-                  size={14}
-                  color={theme.onSurfaceVariant}
-                  style={styles.marginRight}
-                />
-                <NovelInfo theme={theme}>{novel.artist}</NovelInfo>
-              </Row>
-            ) : null}
-            <Row>
-              <MaterialCommunityIcons
-                name={getStatusIcon(
-                  novel.id !== 'NO_ID' ? novel.status : undefined,
-                )}
-                size={14}
-                color={theme.onSurfaceVariant}
-                style={styles.marginRight}
-              />
-              <NovelInfo theme={theme}>
-                {(novel.id !== 'NO_ID'
-                  ? translateNovelStatus(novel.status)
-                  : getString('novelScreen.unknownStatus')) +
-                  ' • ' +
-                  pluginName}
-              </NovelInfo>
-            </Row>
+            {isLoading && novel.id === 'NO_ID' ? (
+              <NovelDetailsSkeleton theme={theme} />
+            ) : (
+              <>
+                {novel.id !== 'NO_ID' && novel.author ? (
+                  <Row style={styles.infoRow}>
+                    <MaterialCommunityIcons
+                      name="fountain-pen-tip"
+                      size={14}
+                      color={theme.onSurfaceVariant}
+                      style={styles.marginRight}
+                    />
+                    <NovelInfo theme={theme}>{novel.author}</NovelInfo>
+                  </Row>
+                ) : null}
+                {novel.id !== 'NO_ID' && novel.artist ? (
+                  <Row style={styles.infoRow}>
+                    <MaterialCommunityIcons
+                      name="palette-outline"
+                      size={14}
+                      color={theme.onSurfaceVariant}
+                      style={styles.marginRight}
+                    />
+                    <NovelInfo theme={theme}>{novel.artist}</NovelInfo>
+                  </Row>
+                ) : null}
+                <Row style={styles.infoRow}>
+                  <MaterialCommunityIcons
+                    name={getStatusIcon(
+                      novel.id !== 'NO_ID' ? novel.status : undefined,
+                    )}
+                    size={14}
+                    color={theme.onSurfaceVariant}
+                    style={styles.marginRight}
+                  />
+                  <NovelInfo theme={theme}>
+                    {(novel.id !== 'NO_ID'
+                      ? translateNovelStatus(novel.status)
+                      : getString('novelScreen.unknownStatus')) +
+                      ' • ' +
+                      pluginName}
+                  </NovelInfo>
+                </Row>
+              </>
+            )}
           </View>
         </NovelInfoContainer>
       </CoverImage>
       <>
-        <NovelScreenButtonGroup
-          novel={novel}
-          handleFollowNovel={handleFollowNovel}
-          handleTrackerSheet={handleTrackerSheet}
-          theme={theme}
-        />
+        {isLoading && novel.id === 'NO_ID' ? (
+          <ButtonGroupSkeleton theme={theme} />
+        ) : (
+          <NovelScreenButtonGroup
+            novel={novel}
+            handleFollowNovel={handleFollowNovel}
+            handleTrackerSheet={handleTrackerSheet}
+            theme={theme}
+          />
+        )}
         {isLoading && (!novel.genres || !novel.summary) ? (
           <NovelMetaSkeleton />
         ) : (
@@ -374,5 +478,37 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingBottom: 16,
     paddingLeft: 12,
+  },
+  infoRow: {
+    marginBottom: 8,
+  },
+  infoSkeletonBar: {
+    borderRadius: 4,
+    height: 14,
+    overflow: 'hidden',
+  },
+  infoSkeletonGradient: {
+    height: 20,
+    position: 'absolute',
+    transform: [{ translateX: '-100%' }],
+    width: '60%',
+  },
+  buttonGroupSkeletonContainer: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    paddingTop: 8,
+    gap: 8,
+  },
+  buttonSkeleton: {
+    borderRadius: 8,
+    flex: 1,
+    height: 52,
+    overflow: 'hidden',
+  },
+  buttonSkeletonGradient: {
+    height: 60,
+    position: 'absolute',
+    transform: [{ translateX: '-100%' }],
+    width: '60%',
   },
 });

@@ -116,7 +116,12 @@ const LibraryScreen = ({ navigation }: LibraryScreenProps) => {
   );
 
   const selectionContextValue = useMemo(
-    () => ({ selectedIdsSet, hasSelection, toggleSelection, setSelectedNovelIds }),
+    () => ({
+      selectedIdsSet,
+      hasSelection,
+      toggleSelection,
+      setSelectedNovelIds,
+    }),
     [selectedIdsSet, hasSelection, toggleSelection],
   );
 
@@ -280,6 +285,8 @@ const LibraryScreen = ({ navigation }: LibraryScreenProps) => {
 
   const renderLabel = useCallback(
     ({ route, color }: TabViewLabelProps) => {
+      const novelIds = route?.novelIds?.filter(id => id !== 0);
+
       return (
         <Row>
           <Text style={[{ color }, styles.fontWeight500]}>{route.title}</Text>
@@ -293,7 +300,7 @@ const LibraryScreen = ({ navigation }: LibraryScreenProps) => {
               <Text
                 style={[styles.badgetText, { color: theme.onSurfaceVariant }]}
               >
-                {route?.novelIds.length}
+                {novelIds.length}
               </Text>
             </View>
           ) : null}
@@ -382,10 +389,7 @@ const LibraryScreen = ({ navigation }: LibraryScreenProps) => {
     }
   }, [history, navigation]);
 
-  const handleEditCategories = useCallback(
-    () => setSelectedNovelIds([]),
-    [],
-  );
+  const handleEditCategories = useCallback(() => setSelectedNovelIds([]), []);
 
   const handleCategorySuccess = useCallback(() => {
     setSelectedNovelIds([]);
@@ -487,10 +491,10 @@ const LibraryScreen = ({ navigation }: LibraryScreenProps) => {
       </SelectionContext.Provider>
 
       {useLibraryFAB &&
-        !isHistoryLoading &&
-        history &&
-        history.length !== 0 &&
-        !error ? (
+      !isHistoryLoading &&
+      history &&
+      history.length !== 0 &&
+      !error ? (
         <FAB
           style={[
             styles.fab,
@@ -531,7 +535,7 @@ function createStyles(theme: ThemeColors) {
   return StyleSheet.create({
     badgeCtn: {
       borderRadius: 50,
-      marginStart: 2,
+      marginStart: 4,
       paddingHorizontal: 6,
       paddingVertical: 2,
       position: 'relative',

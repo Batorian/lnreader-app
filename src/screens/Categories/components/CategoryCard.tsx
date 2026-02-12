@@ -79,7 +79,7 @@ const CategoryCard: React.FC<CategoryCardProps> = ({
                 style={[
                   styles.badge,
                   {
-                    backgroundColor: theme.primary,
+                    backgroundColor: theme.tertiaryContainer,
                   },
                 ]}
               >

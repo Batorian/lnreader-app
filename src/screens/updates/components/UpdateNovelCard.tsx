@@ -22,12 +22,12 @@ type UpdateCardProps = {
   descriptionText: string;
   deleteChapter: (chapter: Update | DownloadedChapter) => void;
 } & (
-    | { chapterList: Update[] | DownloadedChapter[]; chapterListInfo?: undefined }
-    | {
+  | { chapterList: Update[] | DownloadedChapter[]; chapterListInfo?: undefined }
+  | {
       chapterListInfo: UpdateOverview;
       chapterList?: undefined;
     }
-  );
+);
 
 const UpdateNovelCard: React.FC<UpdateCardProps> = ({
   onlyDownloadedChapters = false,
@@ -230,7 +230,7 @@ function createStyles(theme: ThemeColors) {
     },
     description: { fontSize: 12 },
     novelCover: {
-      marginEnd: 8,
+      marginEnd: 16,
     },
     padding: {
       paddingHorizontal: 16,

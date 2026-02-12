@@ -51,7 +51,7 @@ const Item: React.FC<ListItemProps> = ({
     if (icon) {
       return (
         <PaperList.Icon
-          color={theme.onSurfaceVariant}
+          color={theme.primary}
           icon={icon}
           style={styles.iconCtn}
         />
@@ -111,7 +111,7 @@ const InfoItem = ({
   <View style={[styles.infoCtn, style]}>
     <MaterialIcon
       size={20}
-      color={theme.onSurfaceVariant}
+      color={theme.primary}
       name={'information-outline'}
     />
     <Text style={[styles.infoMsg, { color: theme.onSurfaceVariant }]}>
@@ -121,11 +121,7 @@ const InfoItem = ({
 );
 
 const Icon = ({ icon, theme }: { icon: string; theme: ThemeColors }) => (
-  <PaperList.Icon
-    color={theme.onSurfaceVariant}
-    icon={icon}
-    style={styles.margin0}
-  />
+  <PaperList.Icon color={theme.primary} icon={icon} style={styles.margin0} />
 );
 
 interface ColorItemProps {
