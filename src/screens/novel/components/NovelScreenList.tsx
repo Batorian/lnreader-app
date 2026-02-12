@@ -66,6 +66,7 @@ const NovelScreenList = ({
     chapters,
     deleteChapter,
     fetching,
+    firstUnreadChapter,
     getNovel,
     lastRead,
     loading,
@@ -364,14 +365,14 @@ const NovelScreenList = ({
   }, [novel]);
 
   const onFabPress = useCallback(() => {
-    const chapter = lastRead ?? chapters[0];
+    const chapter = lastRead ?? firstUnreadChapter;
     if (chapter) {
       navigation.navigate('ReaderStack', {
         screen: 'Chapter',
         params: { novel, chapter },
       });
     }
-  }, [lastRead, chapters, novel, navigation]);
+  }, [lastRead, firstUnreadChapter, novel, navigation]);
 
   const hasMultiplePages = pages.length > 1 || (novel?.totalPages ?? 0) > 1;
 
@@ -412,6 +413,7 @@ const NovelScreenList = ({
           deleteDownloadsSnackbar={deleteDownloadsSnackbar}
           fetching={fetching}
           filter={filter}
+          firstUnreadChapter={firstUnreadChapter}
           isLoading={loading}
           lastRead={lastRead}
           navigateToChapter={navigateToChapter}
@@ -437,6 +439,7 @@ const NovelScreenList = ({
       deleteDownloadsSnackbar,
       fetching,
       filter,
+      firstUnreadChapter,
       loading,
       lastRead,
       navigateToChapter,
@@ -549,7 +552,7 @@ const NovelScreenList = ({
               visible={showScrollToTop}
             />
           ) : null}
-          {useFabForContinueReading && (lastRead || chapters[0]) ? (
+          {useFabForContinueReading && (lastRead || firstUnreadChapter) ? (
             <AnimatedFAB
               style={continueFabStyle}
               extended={isFabExtended && !loading}

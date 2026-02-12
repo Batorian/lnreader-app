@@ -53,6 +53,7 @@ interface NovelInfoHeaderProps {
   deleteDownloadsSnackbar: UseBooleanReturnType;
   fetching: boolean;
   filter: string;
+  firstUnreadChapter?: ChapterInfo;
   isLoading: boolean;
   lastRead?: ChapterInfo;
   navigateToChapter: (chapter: ChapterInfo) => void;
@@ -137,6 +138,7 @@ const NovelInfoHeader = ({
   deleteDownloadsSnackbar,
   fetching,
   filter,
+  firstUnreadChapter,
   isLoading = false,
   lastRead,
   navigateToChapter,
@@ -299,7 +301,7 @@ const NovelInfoHeader = ({
         )}
         <ReadButton
           navigateToChapter={navigateToChapter}
-          chapters={chapters}
+          firstUnreadChapter={firstUnreadChapter}
           lastRead={lastRead}
         />
         {isLoading && (!novel.genres || !novel.summary) ? (

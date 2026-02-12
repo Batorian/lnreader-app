@@ -306,6 +306,17 @@ export const getNovelChaptersByNumber = (
   );
 };
 
+export const getFirstUnreadChapter = (
+  novelId: number,
+  filter?: string,
+  page?: string,
+) =>
+  db.getFirstAsync<ChapterInfo>(
+    `SELECT * FROM Chapter WHERE novelId = ? AND page = ? AND unread = 1 ${filter || ''} ORDER BY position ASC LIMIT 1`,
+    novelId,
+    page || '1',
+  );
+
 export const getNovelChaptersByName = (novelId: number, searchText: string) => {
   return db.getAllAsync<ChapterInfo>(
     'SELECT * FROM Chapter WHERE novelId = ? AND name LIKE ?',
