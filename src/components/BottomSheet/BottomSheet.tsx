@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBackHandler } from '@hooks/index';
 import { BottomSheetModalMethods } from '@gorhom/bottom-sheet/lib/typescript/types';
 import BottomSheetBackdrop from './BottomSheetBackdrop';
-import { StyleSheet, useWindowDimensions, View } from 'react-native';
+import { useWindowDimensions } from 'react-native';
 import { useTheme } from '@hooks/persisted';
 
 interface BottomSheetProps

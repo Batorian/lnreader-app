@@ -127,6 +127,14 @@ export interface UpdateNovelOptions {
   refreshNovelMetadata?: boolean;
 }
 
+const getStoredTotalPages = async (novelId: number): Promise<number> => {
+  const result = await db.getFirstAsync<{ totalPages: number }>(
+    'SELECT totalPages FROM Novel WHERE id = ?',
+    novelId,
+  );
+  return result?.totalPages ?? 0;
+};
+
 const updateNovel = async (
   pluginId: string,
   novelPath: string,
@@ -137,12 +145,14 @@ const updateNovel = async (
     return;
   }
   const { downloadNewChapters, refreshNovelMetadata } = options;
+
+  const oldTotalPages = await getStoredTotalPages(novelId);
+
   const novel = await fetchNovel(pluginId, novelPath);
 
   if (refreshNovelMetadata) {
     await updateNovelMetadata(pluginId, novelId, novel);
   } else if (novel.totalPages) {
-    // at least update totalPages,
     await updateNovelTotalPages(novelId, novel.totalPages);
   }
 
@@ -152,6 +162,52 @@ const updateNovel = async (
     novel.chapters || [],
     downloadNewChapters,
   );
+
+  // For paged novels: re-fetch the last known page and fetch any new pages
+  if (novel.totalPages && novel.totalPages > 1) {
+    const plugin = getPlugin(pluginId);
+    if (plugin?.parsePage) {
+      // Re-fetch the last known page to check for new chapters
+      if (oldTotalPages > 1) {
+        try {
+          const sourcePage = await fetchPage(
+            pluginId,
+            novelPath,
+            String(oldTotalPages),
+          );
+          await updateNovelChapters(
+            novel.name,
+            novelId,
+            sourcePage.chapters || [],
+            downloadNewChapters,
+            String(oldTotalPages),
+          );
+        } catch {}
+      }
+
+      // Fetch any new pages that were added
+      for (
+        let page = oldTotalPages + 1;
+        page <= novel.totalPages;
+        page++
+      ) {
+        try {
+          const sourcePage = await fetchPage(
+            pluginId,
+            novelPath,
+            String(page),
+          );
+          await updateNovelChapters(
+            novel.name,
+            novelId,
+            sourcePage.chapters || [],
+            downloadNewChapters,
+            String(page),
+          );
+        } catch {}
+      }
+    }
+  }
 };
 
 const updateNovelPage = async (

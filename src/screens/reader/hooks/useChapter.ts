@@ -1,7 +1,9 @@
 import {
   getChapter as getDbChapter,
+  getChapterCount,
   getNextChapter,
   getPrevChapter,
+  insertChapters,
 } from '@database/queries/ChapterQueries';
 import { insertHistory } from '@database/queries/HistoryQueries';
 import { ChapterInfo, NovelInfo } from '@database/types';
@@ -11,7 +13,7 @@ import {
   useTrackedNovel,
   useTracker,
 } from '@hooks/persisted';
-import { fetchChapter } from '@services/plugin/fetch';
+import { fetchChapter, fetchPage } from '@services/plugin/fetch';
 import { NOVEL_STORAGE } from '@utils/Storages';
 import {
   RefObject,
@@ -55,8 +57,13 @@ export default function useChapter(
   const [[nextChapter, prevChapter], setAdjacentChapter] = useState<
     ChapterInfo[] | undefined[]
   >([]);
-  const { autoScroll, autoScrollInterval, autoScrollOffset, useVolumeButtons, volumeButtonsOffset } =
-    useChapterGeneralSettings();
+  const {
+    autoScroll,
+    autoScrollInterval,
+    autoScrollOffset,
+    useVolumeButtons,
+    volumeButtonsOffset,
+  } = useChapterGeneralSettings();
   const { incognitoMode } = useLibrarySettings();
   const [error, setError] = useState<string>();
   const { tracker } = useTracker();
@@ -64,7 +71,10 @@ export default function useChapter(
   const { setImmersiveMode, showStatusAndNavBar } = useFullscreenMode();
 
   const connectVolumeButton = useCallback(() => {
-    const offset = defaultTo(volumeButtonsOffset, Math.round(Dimensions.get('window').height * 0.75));
+    const offset = defaultTo(
+      volumeButtonsOffset,
+      Math.round(Dimensions.get('window').height * 0.75),
+    );
     emmiter.addListener('VolumeUp', () => {
       webViewRef.current?.injectJavaScript(`(()=>{
         window.scrollBy({top: -${offset}, behavior: 'smooth'})
@@ -117,11 +127,68 @@ export default function useChapter(
         const chap = navChapter ?? chapter;
         const cachedText = chapterTextCache.get(chap.id);
         const text = cachedText ?? loadChapterText(chap.id, chap.path);
-        const [nextChap, prevChap, awaitedText] = await Promise.all([
-          getNextChapter(chap.novelId, chap.position!, chap.page),
-          getPrevChapter(chap.novelId, chap.position!, chap.page),
-          text,
-        ]);
+        const [nextChapResult, prevChapResult, awaitedText] = await Promise.all(
+          [
+            getNextChapter(chap.novelId, chap.position!, chap.page),
+            getPrevChapter(chap.novelId, chap.position!, chap.page),
+            text,
+          ],
+        );
+
+        let nextChap = nextChapResult;
+        let prevChap = prevChapResult;
+
+        // Pre-fetch adjacent page chapters if at a page boundary
+        const currentPage = Number(chap.page);
+        if (
+          !nextChap &&
+          novel.totalPages > 0 &&
+          currentPage < novel.totalPages
+        ) {
+          const nextPage = String(currentPage + 1);
+          try {
+            const count = await getChapterCount(chap.novelId, nextPage);
+            if (count === 0) {
+              const sourcePage = await fetchPage(
+                novel.pluginId,
+                novel.path,
+                nextPage,
+              );
+              await insertChapters(
+                chap.novelId,
+                sourcePage.chapters.map(ch => ({ ...ch, page: nextPage })),
+              );
+            }
+            nextChap = await getNextChapter(
+              chap.novelId,
+              chap.position!,
+              chap.page,
+            );
+          } catch {}
+        }
+        if (!prevChap && currentPage > 1) {
+          const prevPage = String(currentPage - 1);
+          try {
+            const count = await getChapterCount(chap.novelId, prevPage);
+            if (count === 0) {
+              const sourcePage = await fetchPage(
+                novel.pluginId,
+                novel.path,
+                prevPage,
+              );
+              await insertChapters(
+                chap.novelId,
+                sourcePage.chapters.map(ch => ({ ...ch, page: prevPage })),
+              );
+            }
+            prevChap = await getPrevChapter(
+              chap.novelId,
+              chap.position!,
+              chap.page,
+            );
+          } catch {}
+        }
+
         if (nextChap && !chapterTextCache.get(nextChap.id)) {
           chapterTextCache.set(
             nextChap.id,
@@ -155,6 +222,8 @@ export default function useChapter(
       setChapterText,
       novel.pluginId,
       novel.name,
+      novel.path,
+      novel.totalPages,
       setLoading,
     ],
   );
