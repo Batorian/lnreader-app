@@ -285,6 +285,7 @@ window.tts = new (function () {
 
   this.start = element => {
     this.stop();
+    this.started = true;
     const startElement = element ?? reader.chapterElement;
     this.currentElement = startElement;
 
@@ -347,8 +348,27 @@ window.tts = new (function () {
 
   this.pause = () => {
     this.reading = false;
-    reader.post({ type: 'stop-speak' });
+    reader.post({ type: 'pause-speak' });
     reader.post({ type: 'tts-state', data: { isReading: false } });
+  };
+
+  this.rewind = () => {
+    if (!this.started || !this.currentElement) return;
+    reader.post({ type: 'pause-speak' });
+    this.reading = true;
+    this.speak();
+  };
+
+  this.seekTo = index => {
+    if (!this.started || !this.allReadableElements.length) return;
+    const targetIndex = Math.max(0, Math.min(index, this.totalElements - 1));
+    reader.post({ type: 'pause-speak' });
+    this.currentElement?.classList?.remove('highlight');
+    this.elementsRead = targetIndex;
+    this.currentElement = this.allReadableElements[targetIndex];
+    this.reading = true;
+    this.elementsRead++;
+    this.speak();
   };
 
   this.stop = () => {
@@ -436,6 +456,7 @@ window.tts = new (function () {
         type: 'speak',
         data: text,
         index: this.elementsRead - 1,
+        total: this.totalElements,
       });
       reader.post({ type: 'tts-state', data: { isReading: true } });
     } else {

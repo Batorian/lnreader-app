@@ -1,87 +1,41 @@
-import * as Notifications from 'expo-notifications';
-import { MMKVStorage } from '@utils/mmkv/mmkv';
+import { NativeEventEmitter } from 'react-native';
+import NativeTTSMediaControl from '@specs/NativeTTSMediaControl';
 
-const TTS_NOTIFICATION_ID = 'tts-control';
-const TTS_ACTION_KEY = 'TTS_NOTIFICATION_ACTION';
-
-export const updateTTSCategory = async (isPlaying: boolean) => {
-  await Notifications.setNotificationCategoryAsync('TTS_CONTROLS', [
-    {
-      identifier: 'TTS_PLAY_PAUSE',
-      buttonTitle: isPlaying ? '⏸️ Pause' : '▶️ Play',
-      options: {
-        opensAppToForeground: false,
-      },
-    },
-    {
-      identifier: 'TTS_STOP',
-      buttonTitle: '⏹️ Stop',
-      options: {
-        opensAppToForeground: false,
-      },
-    },
-    {
-      identifier: 'TTS_NEXT',
-      buttonTitle: '⏭️ Next',
-      options: {
-        opensAppToForeground: false,
-      },
-    },
-  ]);
-};
+export const ttsMediaEmitter = new NativeEventEmitter(NativeTTSMediaControl);
 
 export interface TTSNotificationData {
   novelName: string;
   chapterName: string;
+  coverUri: string;
   isPlaying: boolean;
 }
 
-export const showTTSNotification = async (data: TTSNotificationData) => {
-  await updateTTSCategory(data.isPlaying);
-  await Notifications.scheduleNotificationAsync({
-    identifier: TTS_NOTIFICATION_ID,
-    content: {
-      title: data.novelName,
-      subtitle: data.chapterName,
-      body: data.isPlaying ? 'Playing' : 'Paused',
-      categoryIdentifier: 'TTS_CONTROLS',
-      sticky: true,
-      sound: false,
-      priority: Notifications.AndroidNotificationPriority.HIGH,
-    },
-    trigger: { seconds: 1, channelId: 'tts-controls' },
-  });
+export const showTTSNotification = (data: TTSNotificationData) => {
+  NativeTTSMediaControl.showMediaNotification(
+    data.novelName,
+    data.chapterName,
+    data.coverUri,
+    data.isPlaying,
+  );
 };
 
-export const updateTTSNotification = async (data: TTSNotificationData) => {
-  await updateTTSCategory(data.isPlaying);
-  await Notifications.scheduleNotificationAsync({
-    identifier: TTS_NOTIFICATION_ID,
-    content: {
-      title: data.novelName,
-      subtitle: data.chapterName,
-      body: data.isPlaying ? 'Playing' : 'Paused',
-      categoryIdentifier: 'TTS_CONTROLS',
-      sticky: true,
-      sound: false,
-      priority: Notifications.AndroidNotificationPriority.HIGH,
-    },
-    trigger: { seconds: 1, channelId: 'tts-controls' },
-  });
+export const updateTTSNotification = (data: TTSNotificationData) => {
+  NativeTTSMediaControl.showMediaNotification(
+    data.novelName,
+    data.chapterName,
+    data.coverUri,
+    data.isPlaying,
+  );
 };
 
-export const dismissTTSNotification = async () => {
-  await Notifications.dismissNotificationAsync(TTS_NOTIFICATION_ID);
+export const updateTTSPlaybackState = (isPlaying: boolean) => {
+  NativeTTSMediaControl.updatePlaybackState(isPlaying);
 };
 
-export const setTTSAction = (action: string) => {
-  MMKVStorage.set(TTS_ACTION_KEY, action);
+export const updateTTSProgress = (current: number, total: number) => {
+  NativeTTSMediaControl.updateProgress(current, total);
 };
 
-export const getTTSAction = (): string | undefined => {
-  return MMKVStorage.getString(TTS_ACTION_KEY);
-};
-
-export const clearTTSAction = () => {
-  MMKVStorage.delete(TTS_ACTION_KEY);
+export const dismissTTSNotification = () => {
+  NativeTTSMediaControl.dismiss();
 };

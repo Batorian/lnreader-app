@@ -30,38 +30,6 @@ Notifications.setNotificationHandler({
   },
 });
 
-Notifications.setNotificationCategoryAsync('TTS_CONTROLS', [
-  {
-    identifier: 'TTS_PLAY_PAUSE',
-    buttonTitle: '▶️ Play',
-    options: {
-      opensAppToForeground: false,
-    },
-  },
-  {
-    identifier: 'TTS_STOP',
-    buttonTitle: '⏹️ Stop',
-    options: {
-      opensAppToForeground: false,
-    },
-  },
-  {
-    identifier: 'TTS_NEXT',
-    buttonTitle: '⏭️ Next',
-    options: {
-      opensAppToForeground: false,
-    },
-  },
-]);
-
-Notifications.setNotificationChannelAsync('tts-controls', {
-  name: 'TTS Controls',
-  description: 'Text-to-Speech playback controls',
-  importance: Notifications.AndroidImportance.HIGH,
-  vibrationPattern: [],
-  enableLights: false,
-  enableVibrate: false,
-});
 
 const App = () => {
   const state = useInitDatabase();
@@ -71,22 +39,6 @@ const App = () => {
       LottieSplashScreen.hide();
     }
   }, [state.success, state.error]);
-
-  useEffect(() => {
-    const subscription = Notifications.addNotificationResponseReceivedListener(
-      response => {
-        const actionIdentifier = response.actionIdentifier;
-        if (actionIdentifier.startsWith('TTS_')) {
-          const { setTTSAction } = require('@utils/ttsNotification');
-          setTTSAction(actionIdentifier);
-        }
-      },
-    );
-
-    return () => {
-      subscription.remove();
-    };
-  }, []);
 
   if (state.error) {
     return <ErrorFallback error={state.error} resetError={() => null} />;

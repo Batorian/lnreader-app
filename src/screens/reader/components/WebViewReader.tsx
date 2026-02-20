@@ -28,9 +28,10 @@ import { useChapterContext } from '../ChapterContext';
 import {
   showTTSNotification,
   updateTTSNotification,
+  updateTTSPlaybackState,
+  updateTTSProgress,
   dismissTTSNotification,
-  getTTSAction,
-  clearTTSAction,
+  ttsMediaEmitter,
 } from '@utils/ttsNotification';
 
 type WebViewPostEvent = {
@@ -38,6 +39,7 @@ type WebViewPostEvent = {
   data?: { [key: string]: unknown };
   autoStartTTS?: boolean;
   index?: number;
+  total?: number;
 };
 
 type WebViewReaderProps = {
@@ -114,42 +116,57 @@ const WebViewReader: React.FC<WebViewReaderProps> = ({ onPress }) => {
   }, [readerSettings]);
 
   useEffect(() => {
-    const checkNotificationActions = setInterval(() => {
-      const action = getTTSAction();
-      if (action) {
-        clearTTSAction();
-        switch (action) {
-          case 'TTS_PLAY_PAUSE':
-            webViewRef.current?.injectJavaScript(`
-              if (window.tts) {
-                if (tts.reading) {
-                  tts.pause();
-                } else {
-                  tts.resume();
-                }
-              }
-            `);
-            break;
-          case 'TTS_STOP':
-            webViewRef.current?.injectJavaScript(`
-              if (window.tts) {
-                tts.stop();
-              }
-            `);
-            break;
-          case 'TTS_NEXT':
-            webViewRef.current?.injectJavaScript(`
-              if (window.tts && window.reader && window.reader.nextChapter) {
-                window.reader.post({ type: 'next', autoStartTTS: true });
-              }
-            `);
-            break;
+    const playListener = ttsMediaEmitter.addListener('TTSPlay', () => {
+      webViewRef.current?.injectJavaScript(`
+        if (window.tts && !tts.reading) { tts.resume(); }
+      `);
+    });
+    const pauseListener = ttsMediaEmitter.addListener('TTSPause', () => {
+      webViewRef.current?.injectJavaScript(`
+        if (window.tts && tts.reading) { tts.pause(); }
+      `);
+    });
+    const stopListener = ttsMediaEmitter.addListener('TTSStop', () => {
+      webViewRef.current?.injectJavaScript(`
+        if (window.tts) { tts.stop(); }
+      `);
+    });
+    const rewindListener = ttsMediaEmitter.addListener('TTSRewind', () => {
+      webViewRef.current?.injectJavaScript(`
+        if (window.tts && tts.started) { tts.rewind(); }
+      `);
+    });
+    const prevListener = ttsMediaEmitter.addListener('TTSPrev', () => {
+      webViewRef.current?.injectJavaScript(`
+        if (window.tts && window.reader && window.reader.prevChapter) {
+          window.reader.post({ type: 'prev', autoStartTTS: true });
         }
-      }
-    }, 500);
-
+      `);
+    });
+    const nextListener = ttsMediaEmitter.addListener('TTSNext', () => {
+      webViewRef.current?.injectJavaScript(`
+        if (window.tts && window.reader && window.reader.nextChapter) {
+          window.reader.post({ type: 'next', autoStartTTS: true });
+        }
+      `);
+    });
+    const seekToListener = ttsMediaEmitter.addListener(
+      'TTSSeekTo',
+      (event: { position: number }) => {
+        const position = event.position;
+        webViewRef.current?.injectJavaScript(`
+          if (window.tts && tts.started) { tts.seekTo(${position}); }
+        `);
+      },
+    );
     return () => {
-      clearInterval(checkNotificationActions);
+      playListener.remove();
+      pauseListener.remove();
+      stopListener.remove();
+      rewindListener.remove();
+      prevListener.remove();
+      nextListener.remove();
+      seekToListener.remove();
     };
   }, [webViewRef]);
 
@@ -158,10 +175,11 @@ const WebViewReader: React.FC<WebViewReaderProps> = ({ onPress }) => {
       updateTTSNotification({
         novelName: novel?.name || 'Unknown',
         chapterName: chapter.name,
+        coverUri: novel?.cover || '',
         isPlaying: isTTSReadingRef.current,
       });
     }
-  }, [novel?.name, chapter.name]);
+  }, [novel?.name, novel?.cover, chapter.name]);
 
   useEffect(() => {
     return () => {
@@ -360,6 +378,9 @@ const WebViewReader: React.FC<WebViewReaderProps> = ({ onPress }) => {
             navigateChapter('NEXT');
             break;
           case 'prev':
+            if (event.autoStartTTS) {
+              autoStartTTSRef.current = true;
+            }
             navigateChapter('PREV');
             break;
           case 'save':
@@ -377,37 +398,47 @@ const WebViewReader: React.FC<WebViewReaderProps> = ({ onPress }) => {
                 showTTSNotification({
                   novelName: novel?.name || 'Unknown',
                   chapterName: chapter.name,
+                  coverUri: novel?.cover || '',
                   isPlaying: true,
                 });
               } else {
                 updateTTSNotification({
                   novelName: novel?.name || 'Unknown',
                   chapterName: chapter.name,
+                  coverUri: novel?.cover || '',
                   isPlaying: true,
                 });
+              }
+              if (
+                typeof event.index === 'number' &&
+                typeof event.total === 'number' &&
+                event.total > 0
+              ) {
+                updateTTSProgress(event.index, event.total);
               }
               speakText(event.data);
             } else {
               webViewRef.current?.injectJavaScript('tts.next?.()');
             }
             break;
+          case 'pause-speak':
+            Speech.stop();
+            break;
           case 'stop-speak':
             Speech.stop();
-            isTTSReadingRef.current = false;
-            ttsQueueRef.current = [];
-            ttsQueueIndexRef.current = 0;
-            dismissTTSNotification();
+            if (!autoStartTTSRef.current) {
+              isTTSReadingRef.current = false;
+              ttsQueueRef.current = [];
+              ttsQueueIndexRef.current = 0;
+              dismissTTSNotification();
+            }
             break;
           case 'tts-state':
             if (event.data && typeof event.data === 'object') {
               const data = event.data as { isReading?: boolean };
               const isReading = data.isReading === true;
               isTTSReadingRef.current = isReading;
-              updateTTSNotification({
-                novelName: novel?.name || 'Unknown',
-                chapterName: chapter.name,
-                isPlaying: isReading,
-              });
+              updateTTSPlaybackState(isReading);
             }
             break;
         }
