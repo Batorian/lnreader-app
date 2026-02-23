@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - master
+      - dev-newarch
   workflow_dispatch:
 
 concurrency:
