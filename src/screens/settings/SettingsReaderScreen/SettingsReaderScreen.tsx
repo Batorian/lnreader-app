@@ -60,9 +60,9 @@ const SettingsReaderScreen = () => {
 
   const novel = {
     'artist': null,
-    'author': 'LNReader-kun',
+    'author': 'LNReaderDev-kun',
     'cover':
-      'file:///storage/emulated/0/Android/data/com.rajarsheechatterjee.LNReader/files/Novels/lightnovelcave/16/cover.png?1717862123181',
+      'file:///storage/emulated/0/Android/data/com.rajarsheechatterjee.LNReaderDev/files/Novels/lightnovelcave/16/cover.png?1717862123181',
     'genres': 'Action,Hero',
     'id': 16,
     'inLibrary': 1,
@@ -233,7 +233,7 @@ const SettingsReaderScreen = () => {
               </head>
               <body class="${chapterGeneralSettings.pageReader ? 'page-reader' : ''
               }"> 
-                <div id="LNReader-chapter">
+                <div id="LNReaderDev-chapter">
                 ${dummyHTML}
                 </div>
                 <div id="reader-ui"></div>

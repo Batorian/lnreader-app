@@ -1,7 +1,7 @@
 import { create, list } from './request';
 import { DriveCreateRequestData, DriveFile } from './types';
 
-const LNREADER_DRIVE_MARK = '(Do not change this!) LNReader-Drive';
+const LNREADER_DRIVE_MARK = '(Do not change this!) LNReaderDev-Drive';
 
 export const exists = async (
   fileName: string,

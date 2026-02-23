@@ -2,7 +2,7 @@ package com.rajarsheechatterjee.NativeVolumeButtonListener
 
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.modules.core.DeviceEventManagerModule
-import com.lnreader.spec.NativeVolumeButtonListenerSpec
+import com.lnreaderdev.spec.NativeVolumeButtonListenerSpec
 
 class NativeVolumeButtonListener(appContext: ReactApplicationContext) :
     NativeVolumeButtonListenerSpec(appContext) {

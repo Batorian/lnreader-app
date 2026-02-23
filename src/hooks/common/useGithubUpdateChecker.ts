@@ -13,7 +13,7 @@ const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 export const useGithubUpdateChecker = (): GithubUpdate => {
   const latestReleaseUrl =
-    'https://api.github.com/repos/rajarsheechatterjee/lnreader/releases/latest';
+    'https://api.github.com/repos/rajarsheechatterjee/lnreaderdev/releases/latest';
 
   const [checking, setChecking] = useState(true);
   const [latestRelease, setLatestRelease] = useState<any>();

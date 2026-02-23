@@ -1,6 +1,6 @@
 //
-//  LNReader-Bridging-Header.h
-//  LNReader
+//  LNReaderDev-Bridging-Header.h
+//  LNReaderDev
 //
 //  Created by QUAN on 17/5/25.
 //

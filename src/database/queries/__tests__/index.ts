@@ -1,7 +1,7 @@
 /**
  * Database Query Tests
  *
- * This test suite covers all database query modules in the lnreader application.
+ * This test suite covers all database query modules in the lnreaderdev application.
  * The queries are currently in a migration process from raw SQLite to Drizzle ORM,
  * so some tests may not pass until the migration is complete.
  *

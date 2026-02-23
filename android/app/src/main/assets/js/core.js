@@ -19,7 +19,7 @@ window.reader = new (function () {
   this.readerSettings = van.state(readerSettings);
   this.generalSettings = van.state(chapterGeneralSettings);
 
-  this.chapterElement = document.querySelector('#LNReader-chapter');
+  this.chapterElement = document.querySelector('#LNReaderDev-chapter');
   this.selection = window.getSelection();
   this.viewport = document.querySelector('meta[name=viewport]');
 
@@ -336,7 +336,7 @@ window.tts = new (function () {
     if (!this.reading) {
       if (
         this.currentElement &&
-        this.currentElement.id !== 'LNReader-chapter'
+        this.currentElement.id !== 'LNReaderDev-chapter'
       ) {
         this.speak();
         this.reading = true;

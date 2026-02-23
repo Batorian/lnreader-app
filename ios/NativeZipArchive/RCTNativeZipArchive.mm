@@ -1,6 +1,6 @@
 //
 //  RCTNativeZipArchive.m
-//  LNReader
+//  LNReaderDev
 //
 //  Created by QUAN on 18/5/25.
 //

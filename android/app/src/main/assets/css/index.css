@@ -28,7 +28,7 @@ body {
   font-family: var(--readerSettings-fontFamily);
 }
 
-#LNReader-chapter {
+#LNReaderDev-chapter {
   padding-left: var(--readerSettings-padding);
   padding-right: var(--readerSettings-padding);
 }

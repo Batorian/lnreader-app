@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - master
+      - dev-newarch
   workflow_dispatch:
 
 concurrency:
@@ -79,9 +80,9 @@ jobs:
           COMMIT_COUNT: ${{ env.COMMIT_COUNT }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
         run: |
-          sed -i 's/lnreader/lnreader-r${{ env.COMMIT_COUNT }}(${{ env.COMMIT_ID }})/g' android/app/src/main/res/values/strings.xml
-          cd android && ./gradlew assembleRelease -PcustomAppId=com.rajarsheechatterjee.LNReader.commit_${{ env.COMMIT_ID }} --build-cache
-          mv app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/LNReader-r${{ env.COMMIT_COUNT }}-${{ env.COMMIT_ID }}.apk
+          sed -i 's/lnreaderdev/lnreaderdev-r${{ env.COMMIT_COUNT }}(${{ env.COMMIT_ID }})/g' android/app/src/main/res/values/strings.xml
+          cd android && ./gradlew assembleRelease -PcustomAppId=com.rajarsheechatterjee.LNReaderDev.commit_${{ env.COMMIT_ID }} --build-cache
+          mv app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/LNReaderDev-r${{ env.COMMIT_COUNT }}-${{ env.COMMIT_ID }}.apk
 
       - name: Upload Release Artifact
         env:
@@ -89,6 +90,6 @@ jobs:
           COMMIT_ID: ${{ env.COMMIT_ID }}
         uses: actions/upload-artifact@v4
         with:
-          name: LNReader-r${{ env.COMMIT_COUNT }}-${{ env.COMMIT_ID }}
-          path: android/app/build/outputs/apk/release/LNReader-r${{ env.COMMIT_COUNT }}-${{ env.COMMIT_ID }}.apk
+          name: LNReaderDev-r${{ env.COMMIT_COUNT }}-${{ env.COMMIT_ID }}
+          path: android/app/build/outputs/apk/release/LNReaderDev-r${{ env.COMMIT_COUNT }}-${{ env.COMMIT_ID }}.apk
           retention-days: 30

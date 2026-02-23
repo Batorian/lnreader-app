@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "LNReader",
-    "slug": "LNReader",
-    "scheme": "lnreader",
+    "name": "LNReaderDev",
+    "slug": "LNReaderDev",
+    "scheme": "lnreaderdev",
     "plugins": [
       "expo-localization",
       "react-native-edge-to-edge",

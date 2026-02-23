@@ -89,7 +89,7 @@ const MainNavigator = () => {
         fonts: DefaultTheme.fonts,
       }}
       linking={{
-        prefixes: ['lnreader://'],
+        prefixes: ['lnreaderdev://'],
         config: {
           screens: {
             MoreStack: {

@@ -18,10 +18,10 @@ java sdk --version >= 17    (for version management, get jenv [optional])
 android sdk                 (https://developer.android.com/studio)
 
 # clone your fork to your local machine
-git clone https://github.com/<your-account-name>/lnreader.git
+git clone https://github.com/<your-account-name>/lnreaderdev.git
 
 # step into local repo
-cd lnreader
+cd lnreaderdev
 
 # install pnpm (if not already installed)
 npm install -g pnpm
@@ -29,7 +29,7 @@ npm install -g pnpm
 # install dependencies
 pnpm install
 
-# build the apk (the built apk will be found in ~/lnreader/android/app/build/outputs/apk/release/)
+# build the apk (the built apk will be found in ~/lnreaderdev/android/app/build/outputs/apk/release/)
 pnpm run build:release:android
 ```
 

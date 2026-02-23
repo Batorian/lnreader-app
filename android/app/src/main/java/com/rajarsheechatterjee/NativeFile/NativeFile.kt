@@ -12,7 +12,7 @@ import com.facebook.react.bridge.WritableNativeMap
 import com.facebook.react.modules.network.CookieJarContainer
 import com.facebook.react.modules.network.ForwardingCookieHandler
 import com.facebook.react.modules.network.OkHttpClientProvider
-import com.lnreader.spec.NativeFileSpec
+import com.lnreaderdev.spec.NativeFileSpec
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

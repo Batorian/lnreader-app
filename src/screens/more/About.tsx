@@ -51,7 +51,7 @@ const AboutScreen = ({ navigation }: AboutScreenProps) => {
             title={getString('aboutScreen.whatsNew')}
             onPress={() =>
               Linking.openURL(
-                `https://github.com/lnreader/lnreader/releases/tag/v${version}`,
+                `https://github.com/lnreaderdev/lnreaderdev/releases/tag/v${version}`,
               )
             }
             theme={theme}
@@ -59,8 +59,8 @@ const AboutScreen = ({ navigation }: AboutScreenProps) => {
           <List.Divider theme={theme} />
           <List.Item
             title={getString('aboutScreen.website')}
-            description="https://lnreader.app"
-            onPress={() => Linking.openURL('https://lnreader.app')}
+            description="https://lnreaderdev.app"
+            onPress={() => Linking.openURL('https://lnreaderdev.app')}
             theme={theme}
           />
           <List.Item
@@ -71,25 +71,25 @@ const AboutScreen = ({ navigation }: AboutScreenProps) => {
           />
           <List.Item
             title={getString('aboutScreen.github')}
-            description="https://github.com/lnreader/lnreader"
+            description="https://github.com/lnreaderdev/lnreaderdev"
             onPress={() =>
-              Linking.openURL('https://github.com/lnreader/lnreader')
+              Linking.openURL('https://github.com/lnreaderdev/lnreaderdev')
             }
             theme={theme}
           />
           <List.Item
             title={getString('aboutScreen.plugins')}
-            description="https://github.com/lnreader/lnreader-plugins"
+            description="https://github.com/lnreaderdev/lnreaderdev-plugins"
             onPress={() =>
-              Linking.openURL('https://github.com/lnreader/lnreader-plugins')
+              Linking.openURL('https://github.com/lnreaderdev/lnreaderdev-plugins')
             }
             theme={theme}
           />
           <List.Item
             title={getString('aboutScreen.helpTranslate')}
-            description="https://crowdin.com/project/lnreader"
+            description="https://crowdin.com/project/lnreaderdev"
             onPress={() =>
-              Linking.openURL('https://crowdin.com/project/lnreader')
+              Linking.openURL('https://crowdin.com/project/lnreaderdev')
             }
             theme={theme}
           />

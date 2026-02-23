@@ -1,6 +1,6 @@
 # Database Queries Test Suite
 
-This directory contains tests for all database query modules in the LNReader application. Tests use a real in-memory SQLite database to verify actual data returned by queries.
+This directory contains tests for all database query modules in the LNReaderDev application. Tests use a real in-memory SQLite database to verify actual data returned by queries.
 
 ## Test Files
 

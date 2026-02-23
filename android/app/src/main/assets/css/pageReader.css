@@ -3,7 +3,7 @@ body.page-reader {
   padding-bottom: unset;
 }
 
-body.page-reader > #LNReader-chapter {
+body.page-reader > #LNReaderDev-chapter {
   height: calc(90vh);
   column-width: calc(100vw - var(--readerSettings-padding) * 2);
   column-gap: calc(var(--readerSettings-padding) * 2);

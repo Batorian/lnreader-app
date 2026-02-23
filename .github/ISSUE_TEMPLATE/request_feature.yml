@@ -1,14 +1,14 @@
 # Cloned from tachiyomi
 
 name: Feature request
-description: Suggest a feature to improve LNReader
+description: Suggest a feature to improve LNReaderDev
 labels: [Feature Request]
 body:
   - type: textarea
     id: feature-description
     attributes:
       label: Describe your suggested feature
-      description: How can LNReader be improved?
+      description: How can LNReaderDev be improved?
       placeholder: |
         Example:
           "It should work like this..."
@@ -32,9 +32,9 @@ body:
           required: true
         - label: I have written a short but informative title.
           required: true
-        - label: If this is an issue with a source, I should be opening an issue in the [sources repository](https://github.com/lnreader/lnreader-sources/issues/new/choose).
+        - label: If this is an issue with a source, I should be opening an issue in the [sources repository](https://github.com/lnreaderdev/lnreaderdev-sources/issues/new/choose).
           required: true
-        - label: I have updated the app to version **[2.0.3](https://github.com/lnreader/lnreader/releases/latest)**.
+        - label: I have updated the app to version **[2.0.3](https://github.com/lnreaderdev/lnreaderdev/releases/latest)**.
           required: true
         - label: I will fill out all of the requested information in this form.
           required: true

@@ -23,7 +23,7 @@ class MyLogger implements Logger {
   }
 }
 
-const DB_NAME = 'lnreader.db';
+const DB_NAME = 'lnreaderdev.db';
 const _db = open({ name: DB_NAME, location: '../files/SQLite' });
 
 /**

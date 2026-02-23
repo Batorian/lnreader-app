@@ -1,5 +1,5 @@
 {
-  "name": "lnreader",
+  "name": "lnreaderdev",
   "version": "2.0.3",
   "private": true,
   "scripts": {
@@ -33,7 +33,7 @@
     "type": "modules",
     "jsSrcsDir": "specs",
     "android": {
-      "javaPackageName": "com.lnreader.spec"
+      "javaPackageName": "com.lnreaderdev.spec"
     },
     "ios": {
       "modulesProvider": {

@@ -17,7 +17,7 @@ import androidx.core.app.NotificationCompat
 import androidx.media.app.NotificationCompat.MediaStyle
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.modules.core.DeviceEventManagerModule
-import com.lnreader.spec.NativeTTSMediaControlSpec
+import com.lnreaderdev.spec.NativeTTSMediaControlSpec
 import java.io.File
 import java.net.URL
 
@@ -27,12 +27,12 @@ class NativeTTSMediaControl(private val appContext: ReactApplicationContext) :
     companion object {
         private const val CHANNEL_ID = "tts-media-controls"
         private const val NOTIFICATION_ID = 1001
-        private const val ACTION_PLAY = "com.lnreader.TTS_PLAY"
-        private const val ACTION_PAUSE = "com.lnreader.TTS_PAUSE"
-        private const val ACTION_STOP = "com.lnreader.TTS_STOP"
-        private const val ACTION_PREV = "com.lnreader.TTS_PREV"
-        private const val ACTION_NEXT = "com.lnreader.TTS_NEXT"
-        private const val ACTION_REWIND = "com.lnreader.TTS_REWIND"
+        private const val ACTION_PLAY = "com.lnreaderdev.TTS_PLAY"
+        private const val ACTION_PAUSE = "com.lnreaderdev.TTS_PAUSE"
+        private const val ACTION_STOP = "com.lnreaderdev.TTS_STOP"
+        private const val ACTION_PREV = "com.lnreaderdev.TTS_PREV"
+        private const val ACTION_NEXT = "com.lnreaderdev.TTS_NEXT"
+        private const val ACTION_REWIND = "com.lnreaderdev.TTS_REWIND"
     }
 
     private var mediaSession: MediaSessionCompat? = null
