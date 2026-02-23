@@ -1,7 +1,7 @@
 import * as React from 'react';
 import ChapterItem from './ChapterItem';
 import NovelInfoHeader from './Info/NovelInfoHeader';
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { pickCustomNovelCover } from '@database/queries/NovelQueries';
 import { ChapterInfo, NovelInfo } from '@database/types';
 import { useBoolean } from '@hooks/index';
@@ -13,30 +13,33 @@ import {
 import { getString } from '@strings/translations';
 import { showToast } from '@utils/showToast';
 import {
+  Dimensions,
   NativeSyntheticEvent,
   NativeScrollEvent,
   RefreshControl,
   StyleSheet,
+  View,
 } from 'react-native';
 import { SharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import TrackSheet from './Tracker/TrackSheet';
 import NovelBottomSheet from './NovelBottomSheet';
+import PageNavigationBottomSheet from './PageNavigationBottomSheet';
 import * as Haptics from 'expo-haptics';
 import { AnimatedFAB } from 'react-native-paper';
 import { ChapterListSkeleton } from '@components/Skeleton/Skeleton';
 import { BottomSheetModalMethods } from '@gorhom/bottom-sheet/lib/typescript/types';
 import { useNovelContext } from '../NovelContext';
-import { FlashList } from '@shopify/flash-list';
+import { LegendList, LegendListRef } from '@legendapp/list';
 import FileManager from '@specs/NativeFile';
 import { downloadFile } from '@plugins/helpers/fetch';
-import { StorageAccessFramework } from 'expo-file-system';
+import { StorageAccessFramework } from 'expo-file-system/legacy';
+import PagePaginationControl from './PagePaginationControl';
 
 type NovelScreenListProps = {
   headerOpacity: SharedValue<number>;
-  listRef: React.RefObject<FlashList<ChapterInfo> | null>;
+  listRef: React.RefObject<LegendListRef | null>;
   navigation: any;
-  openDrawer: () => void;
   selected: ChapterInfo[];
   setSelected: React.Dispatch<React.SetStateAction<ChapterInfo[]>>;
   getNextChapterBatch: () => void;
@@ -44,17 +47,16 @@ type NovelScreenListProps = {
     name: string;
     path: string;
     pluginId: string;
-    cover?: string;
+    cover?: string | null;
   };
 };
 
-const ListEmptyComponent = () => <ChapterListSkeleton />;
+const chapterKeyExtractor = (item: ChapterInfo) => 'c' + item.id;
 
 const NovelScreenList = ({
   headerOpacity,
   listRef,
   navigation,
-  openDrawer,
   routeBaseNovel,
   selected,
   setSelected,
@@ -64,6 +66,7 @@ const NovelScreenList = ({
     chapters,
     deleteChapter,
     fetching,
+    firstUnreadChapter,
     getNovel,
     lastRead,
     loading,
@@ -72,10 +75,11 @@ const NovelScreenList = ({
     setNovel,
     sortAndFilterChapters,
     setShowChapterTitles,
-    updateChapter,
     novel: fetchedNovel,
     batchInformation,
     pageIndex,
+    openPage,
+    updateChapter,
   } = useNovelContext();
 
   const { pluginId } = routeBaseNovel;
@@ -98,33 +102,152 @@ const NovelScreenList = ({
 
   const {
     sort = defaultChapterSort,
-    filter = '',
+    filter,
     showChapterTitles = false,
   } = novelSettings;
 
   const theme = useTheme();
   const { top: topInset, bottom: bottomInset } = useSafeAreaInsets();
 
-  const { downloadQueue, downloadChapter } = useDownload();
+  const { downloadingChapterIds, downloadChapter } = useDownload();
+
+  // Mark chapters as downloaded when their download completes
+  const prevDownloadingRef = useRef(downloadingChapterIds);
+  useEffect(() => {
+    const prev = prevDownloadingRef.current;
+    prevDownloadingRef.current = downloadingChapterIds;
+    if (prev === downloadingChapterIds) {
+      return;
+    }
+    for (const id of prev) {
+      if (!downloadingChapterIds.has(id)) {
+        const index = chapters.findIndex(c => c.id === id);
+        if (index !== -1) {
+          updateChapter(index, { isDownloaded: true });
+        }
+      }
+    }
+  }, [downloadingChapterIds, chapters, updateChapter]);
 
   const [isFabExtended, setIsFabExtended] = useState(true);
+  const [showScrollToTop, setShowScrollToTop] = useState(false);
 
   const novelBottomSheetRef = useRef<BottomSheetModalMethods>(null);
   const trackerSheetRef = useRef<BottomSheetModalMethods>(null);
+  const pageNavigationSheetRef = useRef<BottomSheetModalMethods>(null);
 
   const deleteDownloadsSnackbar = useBoolean();
 
-  const onPageScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const y = event.nativeEvent.contentOffset.y;
+  // Derive selectedIds Set for O(1) lookups
+  const selectedIds = useMemo(
+    () => new Set(selected.map(s => s.id)),
+    [selected],
+  );
+  const isSelectionMode = selected.length > 0;
 
-    headerOpacity.set(y < 50 ? 0 : (y - 50) / 150);
-    const currentScrollPosition = Math.floor(y) ?? 0;
-    if (useFabForContinueReading && lastRead) {
-      setIsFabExtended(currentScrollPosition <= 0);
-    }
-  };
+  const onPageScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const y = event.nativeEvent.contentOffset.y;
 
-  const onRefresh = async () => {
+      headerOpacity.set(y < 50 ? 0 : (y - 50) / 150);
+      const currentScrollPosition = Math.floor(y) ?? 0;
+      if (useFabForContinueReading && lastRead) {
+        setIsFabExtended(currentScrollPosition <= 0);
+      }
+
+      const screenHeight = Dimensions.get('window').height;
+      setShowScrollToTop(currentScrollPosition > screenHeight / 2);
+    },
+    [headerOpacity, useFabForContinueReading, lastRead],
+  );
+
+  // --- Stable callbacks ---
+
+  const navigateToChapter = useCallback(
+    (chapter: ChapterInfo) => {
+      navigation.navigate('ReaderStack', {
+        screen: 'Chapter',
+        params: { novel, chapter },
+      });
+    },
+    [navigation, novel],
+  );
+
+  const onSelectPress = useCallback(
+    (chapter: ChapterInfo) => {
+      if (!isSelectionMode) {
+        navigateToChapter(chapter);
+      } else {
+        setSelected(sel =>
+          sel.some(it => it.id === chapter.id)
+            ? sel.filter(it => it.id !== chapter.id)
+            : [...sel, chapter],
+        );
+      }
+    },
+    [isSelectionMode, navigateToChapter, setSelected],
+  );
+
+  const onSelectLongPress = useCallback(
+    (chapter: ChapterInfo) => {
+      setSelected(sel => {
+        if (sel.length === 0) {
+          if (!disableHapticFeedback) {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          }
+          return [...sel, chapter];
+        }
+        if (sel.length === chapters.length) {
+          return sel;
+        }
+
+        const lastSelectedChapter = sel[sel.length - 1];
+        if (lastSelectedChapter.id === chapter.id) {
+          return sel;
+        }
+
+        if (lastSelectedChapter.id > chapter.id) {
+          return [
+            ...sel,
+            chapter,
+            ...chapters.filter(
+              (chap: ChapterInfo) =>
+                (chap.id <= chapter.id || chap.id >= lastSelectedChapter.id) ===
+                false,
+            ),
+          ];
+        }
+        return [
+          ...sel,
+          chapter,
+          ...chapters.filter(
+            (chap: ChapterInfo) =>
+              (chap.id >= chapter.id || chap.id <= lastSelectedChapter.id) ===
+              false,
+          ),
+        ];
+      });
+    },
+    [chapters, disableHapticFeedback],
+  );
+
+  const handleDeleteChapter = useCallback(
+    (chapter: ChapterInfo) => {
+      deleteChapter(chapter);
+    },
+    [deleteChapter],
+  );
+
+  const handleDownloadChapter = useCallback(
+    (chapter: ChapterInfo) => {
+      if (novel && novel.id !== 'NO_ID') {
+        downloadChapter(novel, chapter);
+      }
+    },
+    [novel, downloadChapter],
+  );
+
+  const onRefresh = useCallback(async () => {
     if (novel.id !== 'NO_ID') {
       setUpdating(true);
       updateNovel(pluginId, novel.path, novel.id, {
@@ -140,97 +263,42 @@ const NovelScreenList = ({
         .catch(error => showToast('Failed updating: ' + error.message))
         .finally(() => setUpdating(false));
     }
-  };
+  }, [novel, pluginId, downloadNewChapters, refreshNovelMetadata, getNovel]);
 
-  const onRefreshPage = async (page: string) => {
-    if (novel.id !== 'NO_ID') {
-      setUpdating(true);
-      updateNovelPage(pluginId, novel.path, novel.id, page, {
-        downloadNewChapters,
-      })
-        .then(() => getNovel())
-        .then(() => showToast(`Updated page: ${page}`))
-        .catch(e => showToast('Failed updating: ' + e.message))
-        .finally(() => setUpdating(false));
-    }
-  };
-
-  const refreshControl = () => (
-    <RefreshControl
-      progressViewOffset={topInset + 32}
-      onRefresh={onRefresh}
-      refreshing={updating}
-      colors={[theme.primary]}
-      progressBackgroundColor={theme.onPrimary}
-    />
+  const onRefreshPage = useCallback(
+    async (page: string) => {
+      if (novel.id !== 'NO_ID') {
+        setUpdating(true);
+        updateNovelPage(pluginId, novel.path, novel.path, novel.id, page, {
+          downloadNewChapters,
+        })
+          .then(() => getNovel())
+          .then(() => showToast(`Updated page: ${page}`))
+          .catch(e => showToast('Failed updating: ' + e.message))
+          .finally(() => setUpdating(false));
+      }
+    },
+    [novel, pluginId, downloadNewChapters, getNovel],
   );
 
-  const isSelected = (id: number) => {
-    return selected.some(obj => obj.id === id);
-  };
+  const refreshControlElement = useMemo(
+    () => (
+      <RefreshControl
+        progressViewOffset={topInset + 32}
+        onRefresh={onRefresh}
+        refreshing={updating}
+        colors={[theme.primary]}
+        progressBackgroundColor={theme.onPrimary}
+      />
+    ),
+    [onRefresh, updating, topInset, theme.primary, theme.onPrimary],
+  );
 
-  const onSelectPress = (chapter: ChapterInfo) => {
-    if (selected.length === 0) {
-      navigateToChapter(chapter);
-    } else {
-      if (isSelected(chapter.id)) {
-        setSelected(sel => sel.filter(it => it.id !== chapter.id));
-      } else {
-        setSelected(sel => [...sel, chapter]);
-      }
-    }
-  };
+  const scrollToTop = useCallback(() => {
+    listRef.current?.scrollToOffset({ offset: 0, animated: true });
+  }, [listRef]);
 
-  const onSelectLongPress = (chapter: ChapterInfo) => {
-    if (selected.length === 0) {
-      if (!disableHapticFeedback) {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      }
-      setSelected(sel => [...sel, chapter]);
-    } else {
-      if (selected.length === chapters.length) {
-        return;
-      }
-
-      /**
-       * Select custom range
-       */
-      const lastSelectedChapter = selected[selected.length - 1];
-
-      if (lastSelectedChapter.id !== chapter.id) {
-        if (lastSelectedChapter.id > chapter.id) {
-          setSelected(sel => [
-            ...sel,
-            chapter,
-            ...chapters.filter(
-              (chap: ChapterInfo) =>
-                (chap.id <= chapter.id || chap.id >= lastSelectedChapter.id) ===
-                false,
-            ),
-          ]);
-        } else {
-          setSelected(sel => [
-            ...sel,
-            chapter,
-            ...chapters.filter(
-              (chap: ChapterInfo) =>
-                (chap.id >= chapter.id || chap.id <= lastSelectedChapter.id) ===
-                false,
-            ),
-          ]);
-        }
-      }
-    }
-  };
-
-  const navigateToChapter = (chapter: ChapterInfo) => {
-    navigation.navigate('ReaderStack', {
-      screen: 'Chapter',
-      params: { novel, chapter },
-    });
-  };
-
-  const setCustomNovelCover = async () => {
+  const setCustomNovelCover = useCallback(async () => {
     if (!novel || novel.id === 'NO_ID') {
       return;
     }
@@ -241,9 +309,9 @@ const NovelScreenList = ({
         cover: newCover,
       });
     }
-  };
+  }, [novel, setNovel]);
 
-  const saveNovelCover = async () => {
+  const saveNovelCover = useCallback(async () => {
     if (!novel) {
       showToast(getString('novelScreen.coverNotSaved'));
       return;
@@ -271,7 +339,6 @@ const NovelScreenList = ({
         ? imageExtension
         : 'png';
 
-      // sanitize novel name as app crashes while copying file with ':' character
       const novelName = novel.name.replace(/[^a-zA-Z0-9]/g, '_');
       const fileName = `${novelName}_${novel.id}.${imageExtension}`;
       const coverDestUri = await StorageAccessFramework.createFileAsync(
@@ -295,81 +362,165 @@ const NovelScreenList = ({
         FileManager.unlink(tempCoverUri);
       }
     }
-  };
+  }, [novel]);
+
+  const onFabPress = useCallback(() => {
+    const chapter = lastRead ?? firstUnreadChapter;
+    if (chapter) {
+      navigation.navigate('ReaderStack', {
+        screen: 'Chapter',
+        params: { novel, chapter },
+      });
+    }
+  }, [lastRead, firstUnreadChapter, novel, navigation]);
+
+  const hasMultiplePages = pages.length > 1 || (novel?.totalPages ?? 0) > 1;
+
+  const openPageNavDrawer = useCallback(
+    () => pageNavigationSheetRef.current?.present(),
+    [],
+  );
+
+  // --- Memoized list components ---
+
+  const paginationControl = useMemo(() => {
+    if (!hasMultiplePages) {
+      return null;
+    }
+    return (
+      <View>
+        <PagePaginationControl
+          pages={pages}
+          currentPageIndex={pageIndex}
+          onPageChange={openPage}
+          onOpenDrawer={openPageNavDrawer}
+          theme={theme}
+        />
+      </View>
+    );
+  }, [hasMultiplePages, pages, pageIndex, openPage, openPageNavDrawer, theme]);
+
+  const listEmptyComponent = useMemo(
+    () => (fetching ? <ChapterListSkeleton /> : null),
+    [fetching],
+  );
+
+  const listHeader = useMemo(
+    () => (
+      <>
+        <NovelInfoHeader
+          chapters={chapters}
+          deleteDownloadsSnackbar={deleteDownloadsSnackbar}
+          fetching={fetching}
+          filter={filter}
+          firstUnreadChapter={firstUnreadChapter}
+          isLoading={loading}
+          lastRead={lastRead}
+          navigateToChapter={navigateToChapter}
+          navigation={navigation}
+          novel={novel}
+          novelBottomSheetRef={novelBottomSheetRef}
+          onRefreshPage={onRefreshPage}
+          page={pages.length > 1 ? pages[pageIndex] : undefined}
+          pageIndex={pageIndex}
+          pages={pages}
+          pageNavigationSheetRef={pageNavigationSheetRef}
+          setCustomNovelCover={setCustomNovelCover}
+          saveNovelCover={saveNovelCover}
+          theme={theme}
+          totalChapters={batchInformation.totalChapters}
+          trackerSheetRef={trackerSheetRef}
+        />
+        {paginationControl}
+      </>
+    ),
+    [
+      chapters,
+      deleteDownloadsSnackbar,
+      fetching,
+      filter,
+      firstUnreadChapter,
+      loading,
+      lastRead,
+      navigateToChapter,
+      navigation,
+      novel,
+      onRefreshPage,
+      pages,
+      pageIndex,
+      setCustomNovelCover,
+      saveNovelCover,
+      theme,
+      batchInformation.totalChapters,
+      paginationControl,
+    ],
+  );
+
+  const scrollToTopFabStyle = useMemo(
+    () => [
+      styles.scrollToTopFab,
+      { backgroundColor: theme.surface2, marginBottom: bottomInset },
+    ],
+    [theme.surface2, bottomInset],
+  );
+
+  const continueFabStyle = useMemo(
+    () => [
+      styles.fab,
+      { backgroundColor: theme.primary, marginBottom: bottomInset },
+    ],
+    [theme.primary, bottomInset],
+  );
+
+  const continueFabLabel = useMemo(
+    () =>
+      lastRead
+        ? getString('common.resume')
+        : getString('novelScreen.startReadingChapters', { name: '' }).trim(),
+    [lastRead],
+  );
 
   return (
     <>
-      <FlashList
+      <LegendList
         ref={listRef}
         estimatedItemSize={64}
         data={chapters}
-        extraData={[
-          chapters.length,
-          selected.length,
-          novel.id,
-          loading,
-          downloadQueue.length,
-        ]}
-        // ListEmptyComponent={ListEmptyComponent}
-        ListFooterComponent={!fetching ? undefined : ListEmptyComponent}
-        renderItem={({ item, index }) => {
+        recycleItems
+        ListEmptyComponent={listEmptyComponent}
+        renderItem={({ item }) => {
           if (novel.id === 'NO_ID') {
             return null;
           }
           return (
             <ChapterItem
-              isDownloading={downloadQueue.some(
-                c => c.task.data.chapterId === item.id,
-              )}
-              isBookmarked={!!item.bookmark}
-              isLocal={novel.isLocal}
-              theme={theme}
               chapter={item}
+              isDownloading={downloadingChapterIds.has(item.id)}
+              isBookmarked={!!item.bookmark}
+              isLocal={novel.isLocal ?? false}
+              theme={theme}
               showChapterTitles={showChapterTitles}
-              deleteChapter={() => deleteChapter(item)}
-              downloadChapter={() => downloadChapter(novel, item)}
-              isSelected={isSelected(item.id)}
+              isSelected={selectedIds.has(item.id)}
+              novelName={novel.name}
+              onDeleteChapter={handleDeleteChapter}
+              onDownloadChapter={handleDownloadChapter}
               onSelectPress={onSelectPress}
               onSelectLongPress={onSelectLongPress}
-              navigateToChapter={navigateToChapter}
-              novelName={novel.name}
-              setChapterDownloaded={(value: boolean) =>
-                updateChapter?.(index, { isDownloaded: value })
-              }
             />
           );
         }}
-        keyExtractor={item => 'c' + item.id}
+        keyExtractor={chapterKeyExtractor}
+        extraData={[downloadingChapterIds, selectedIds]}
         contentContainerStyle={styles.contentContainer}
-        refreshControl={refreshControl()}
+        refreshControl={refreshControlElement}
         onEndReached={getNextChapterBatch}
         onEndReachedThreshold={6}
         onScroll={onPageScroll}
+        scrollEventThrottle={16}
         drawDistance={1000}
-        ListHeaderComponent={
-          <NovelInfoHeader
-            chapters={chapters}
-            deleteDownloadsSnackbar={deleteDownloadsSnackbar}
-            fetching={fetching}
-            filter={filter}
-            isLoading={loading}
-            lastRead={lastRead}
-            navigateToChapter={navigateToChapter}
-            navigation={navigation}
-            novel={novel}
-            novelBottomSheetRef={novelBottomSheetRef}
-            onRefreshPage={onRefreshPage}
-            openDrawer={openDrawer}
-            page={pages.length > 1 ? pages[pageIndex] : undefined}
-            setCustomNovelCover={setCustomNovelCover}
-            saveNovelCover={saveNovelCover}
-            theme={theme}
-            totalChapters={batchInformation.totalChapters}
-            trackerSheetRef={trackerSheetRef}
-          />
-        }
+        ListHeaderComponent={listHeader}
       />
-      {novel.id !== 'NO_ID' && (
+      {novel.id !== 'NO_ID' ? (
         <>
           <NovelBottomSheet
             bottomSheetRef={novelBottomSheetRef}
@@ -380,44 +531,44 @@ const NovelScreenList = ({
             filter={filter}
             showChapterTitles={showChapterTitles}
           />
-          <TrackSheet
-            bottomSheetRef={trackerSheetRef}
-            novel={novel}
-            theme={theme}
-          />
-          {useFabForContinueReading && (lastRead || chapters[0]) ? (
+          <TrackSheet bottomSheetRef={trackerSheetRef} novel={novel} />
+          {(novel.totalPages ?? 0) > 1 || pages.length > 1 ? (
+            <PageNavigationBottomSheet
+              bottomSheetRef={pageNavigationSheetRef}
+              theme={theme}
+              pages={pages}
+              pageIndex={pageIndex}
+              openPage={openPage}
+            />
+          ) : null}
+          {showScrollToTop ? (
             <AnimatedFAB
-              style={[
-                styles.fab,
-                { backgroundColor: theme.primary, marginBottom: bottomInset },
-              ]}
+              style={scrollToTopFabStyle}
+              color={theme.primary}
+              icon="arrow-up"
+              label=""
+              extended={false}
+              onPress={scrollToTop}
+              visible={showScrollToTop}
+            />
+          ) : null}
+          {useFabForContinueReading && (lastRead || firstUnreadChapter) ? (
+            <AnimatedFAB
+              style={continueFabStyle}
               extended={isFabExtended && !loading}
               color={theme.onPrimary}
               uppercase={false}
-              label={
-                lastRead
-                  ? getString('common.resume')
-                  : getString('novelScreen.startReadingChapters', {
-                      name: '',
-                    }).trim()
-              }
+              label={continueFabLabel}
               icon="play"
-              onPress={() => {
-                navigation.navigate('ReaderStack', {
-                  screen: 'Chapter',
-                  params: {
-                    novel: novel,
-                    chapter: lastRead ?? chapters[0],
-                  },
-                });
-              }}
+              onPress={onFabPress}
             />
           ) : null}
         </>
-      )}
+      ) : null}
     </>
   );
 };
+
 const styles = StyleSheet.create({
   container: { flex: 1 },
   contentContainer: { paddingBottom: 100 },
@@ -432,6 +583,10 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
+  },
+  scrollToTopFab: {
+    bottom: 16,
+    position: 'absolute',
   },
 });
 

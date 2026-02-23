@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -15,7 +15,7 @@ import { SafeAreaView, SearchbarV2 } from '@components';
 
 import { showToast } from '@utils/showToast';
 import { scrapeSearchResults, scrapeTopNovels } from './MyAnimeListScraper';
-import MalNovelCard from './TrackerNovelCard';
+import DiscoverNovelCard from './DiscoverNovelCard';
 import { useTheme } from '@hooks/persisted';
 import MalLoading from '../loadingAnimation/MalLoading';
 import { BrowseMalScreenProps } from '@navigators/types';
@@ -74,7 +74,7 @@ const BrowseMalScreen = ({ navigation }: BrowseMalScreenProps) => {
   }, [getNovels]);
 
   const renderItem: FlatListProps<any>['renderItem'] = ({ item }) => (
-    <MalNovelCard
+    <DiscoverNovelCard
       novel={item}
       theme={theme}
       onPress={() =>
@@ -96,6 +96,25 @@ const BrowseMalScreen = ({ navigation }: BrowseMalScreenProps) => {
       contentSize.height - paddingToBottom
     );
   };
+
+  const loadingMore = useRef(false);
+
+  const onScroll = useCallback(
+    ({ nativeEvent }: { nativeEvent: NativeScrollEvent }) => {
+      if (!searchText && !loadingMore.current && isCloseToBottom(nativeEvent)) {
+        loadingMore.current = true;
+
+        setLimit(before => {
+          const newLimit = before + 50;
+          getNovels(newLimit).finally(() => {
+            loadingMore.current = false;
+          });
+          return newLimit;
+        });
+      }
+    },
+    [searchText, getNovels],
+  );
 
   const ListEmptyComponent = useCallback(
     () => (
@@ -145,15 +164,10 @@ const BrowseMalScreen = ({ navigation }: BrowseMalScreenProps) => {
           keyExtractor={(item, index) => item.novelName + index}
           renderItem={renderItem}
           ListEmptyComponent={ListEmptyComponent}
-          onScroll={({ nativeEvent }) => {
-            if (!searchText && isCloseToBottom(nativeEvent)) {
-              getNovels(limit + 50);
-              setLimit(before => before + 50);
-            }
-          }}
+          onScroll={onScroll}
           ListFooterComponent={
             !searchText ? (
-              <View style={{ paddingVertical: 16 }}>
+              <View style={styles.paddingVertical}>
                 <ActivityIndicator color={theme.primary} />
               </View>
             ) : null
@@ -175,4 +189,5 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     paddingHorizontal: 4,
   },
+  paddingVertical: { paddingVertical: 16 },
 });

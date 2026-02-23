@@ -1,6 +1,5 @@
 import React, { Suspense, useCallback, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View, StatusBar, Text, Share } from 'react-native';
-import { Drawer } from 'react-native-drawer-layout';
 import Animated, {
   SlideInUp,
   SlideOutUp,
@@ -19,28 +18,29 @@ import NovelScreenLoading from './components/LoadingAnimation/NovelScreenLoading
 import { NovelScreenProps } from '@navigators/types';
 import { ChapterInfo } from '@database/types';
 import { getString } from '@strings/translations';
-import NovelDrawer from './components/NovelDrawer';
 import { isNumber, noop } from 'lodash-es';
 import NovelAppbar from './components/NovelAppbar';
 import { resolveUrl } from '@services/plugin/fetch';
-import { updateChapterProgressByIds } from '@database/queries/ChapterQueries';
+import {
+  getAllUndownloadedAndUnreadChapters,
+  getAllUndownloadedChapters,
+  updateChapterProgressByIds,
+} from '@database/queries/ChapterQueries';
 import { MaterialDesignIconName } from '@type/icon';
 import NovelScreenList from './components/NovelScreenList';
 import { ThemeColors } from '@theme/types';
 import { SafeAreaView } from '@components';
 import { useNovelContext } from './NovelContext';
-import { FlashList } from '@shopify/flash-list';
+import { LegendListRef } from '@legendapp/list';
 
 const Novel = ({ route, navigation }: NovelScreenProps) => {
   const {
-    pageIndex,
-    pages,
     novel,
     chapters,
     fetching,
     batchInformation,
     getNextChapterBatch,
-    openPage,
+    loadUpToBatch,
     setNovel,
     bookmarkChapters,
     markChaptersRead,
@@ -57,55 +57,59 @@ const Novel = ({ route, navigation }: NovelScreenProps) => {
   const [selected, setSelected] = useState<ChapterInfo[]>([]);
   const [editInfoModal, showEditInfoModal] = useState(false);
 
-  const chapterListRef = useRef<FlashList<ChapterInfo> | null>(null);
+  const chapterListRef = useRef<LegendListRef | null>(null);
 
   const deleteDownloadsSnackbar = useBoolean();
 
   const headerOpacity = useSharedValue(0);
-  const {
-    value: drawerOpen,
-    setTrue: openDrawer,
-    setFalse: closeDrawer,
-  } = useBoolean();
-
-  // TODO: fix this
-  // useEffect(() => {
-  //   if (chapters.length !== 0 && !fetching) {
-  //     refreshChapters();
-  //   }
-  // }, [chapters.length, downloadQueue.length, fetching, refreshChapters]);
-
-  // useFocusEffect(refreshChapters);
 
   const downloadChs = useCallback(
-    (amount: number | 'all' | 'unread') => {
+    async (amount: number | 'all' | 'unread') => {
       if (!novel) {
         return;
       }
-      let filtered = chapters.filter(chapter => !chapter.isDownloaded);
+
+      let chaptersToUse = chapters;
+
+      if (amount === 'all') {
+        const allChapters = await getAllUndownloadedChapters(novel.id);
+        chaptersToUse = allChapters;
+      }
+
       if (amount === 'unread') {
-        filtered = filtered.filter(chapter => chapter.unread);
+        const allUnreadChapters = await getAllUndownloadedAndUnreadChapters(
+          novel.id,
+        );
+        chaptersToUse = allUnreadChapters;
       }
+
+      let filtered = chaptersToUse;
+
       if (isNumber(amount)) {
-        filtered = filtered.slice(0, amount);
+        filtered = filtered
+          .filter(chapter => !chapter.isDownloaded)
+          .slice(0, amount);
       }
-      if (filtered) {
+
+      if (filtered.length > 0) {
         downloadChapters(novel, filtered);
       }
     },
     [chapters, downloadChapters, novel],
   );
+
   const deleteChs = useCallback(() => {
     deleteChapters(chapters.filter(c => c.isDownloaded));
   }, [chapters, deleteChapters]);
-  const shareNovel = () => {
+
+  const shareNovel = useCallback(() => {
     if (!novel) {
       return;
     }
     Share.share({
       message: resolveUrl(novel.pluginId, novel.path, true),
     });
-  };
+  }, [novel]);
 
   const [jumpToChapterModal, showJumpToChapterModal] = useState(false);
   const {
@@ -207,7 +211,7 @@ const Novel = ({ route, navigation }: NovelScreenProps) => {
     selected,
   ]);
 
-  const setCustomNovelCover = async () => {
+  const setCustomNovelCover = useCallback(async () => {
     if (!novel) {
       return;
     }
@@ -218,146 +222,158 @@ const Novel = ({ route, navigation }: NovelScreenProps) => {
         cover: newCover,
       });
     }
-  };
+  }, [novel, setNovel]);
+
+  const stableGetNextBatch = useMemo(
+    () =>
+      batchInformation.batch < batchInformation.total && !fetching
+        ? getNextChapterBatch
+        : noop,
+    [batchInformation.batch, batchInformation.total, fetching, getNextChapterBatch],
+  );
+
+  const hideJumpToChapterModal = useCallback(
+    () => showJumpToChapterModal(false),
+    [],
+  );
+  const hideEditInfoModal = useCallback(
+    () => showEditInfoModal(false),
+    [],
+  );
+  const clearSelection = useCallback(() => setSelected([]), []);
+  const selectAll = useCallback(() => setSelected(chapters), [chapters]);
+
+  const snackbarTheme = useMemo(
+    () => ({ colors: { primary: theme.primary } }),
+    [theme.primary],
+  );
+  const snackbarTextStyle = useMemo(
+    () => ({ color: theme.onSurface }),
+    [theme.onSurface],
+  );
+  const titleStyle = useMemo(
+    () => ({ color: theme.onSurface }),
+    [theme.onSurface],
+  );
+  const snackbarAction = useMemo(
+    () => ({
+      label: getString('common.delete'),
+      onPress: () => {
+        deleteChapters(chapters.filter(c => c.isDownloaded));
+      },
+    }),
+    [chapters, deleteChapters],
+  );
+
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const containerStyle = useMemo(
+    () => [styles.container, { backgroundColor: theme.background }],
+    [styles.container, theme.background],
+  );
 
   return (
-    <Drawer
-      open={drawerOpen}
-      onOpen={openDrawer}
-      onClose={closeDrawer}
-      swipeEnabled={pages.length > 1}
-      hideStatusBarOnOpen={true}
-      swipeMinVelocity={1000}
-      drawerStyle={styles.drawer}
-      renderDrawerContent={() =>
-        (novel?.totalPages ?? 0) > 1 || pages.length > 1 ? (
-          <NovelDrawer
-            theme={theme}
-            pages={pages}
-            pageIndex={pageIndex}
-            openPage={openPage}
-            closeDrawer={closeDrawer}
-          />
-        ) : (
-          <></>
-        )
-      }
-    >
-      <Portal.Host>
-        <View style={[styles.container, { backgroundColor: theme.background }]}>
-          <Portal>
-            {selected.length === 0 ? (
-              <NovelAppbar
+    <Portal.Host>
+      <View style={containerStyle}>
+        <Portal>
+          {selected.length === 0 ? (
+            <NovelAppbar
+              novel={novel}
+              deleteChapters={deleteChs}
+              downloadChapters={downloadChs}
+              showEditInfoModal={showEditInfoModal}
+              setCustomNovelCover={setCustomNovelCover}
+              downloadCustomChapterModal={openDlChapterModal}
+              showJumpToChapterModal={showJumpToChapterModal}
+              shareNovel={shareNovel}
+              theme={theme}
+              isLocal={novel?.isLocal ?? route.params?.isLocal ?? false}
+              goBack={navigation.goBack}
+              headerOpacity={headerOpacity}
+            />
+          ) : (
+            <Animated.View
+              entering={SlideInUp.duration(250)}
+              exiting={SlideOutUp.duration(250)}
+              style={styles.appbar}
+            >
+              <Appbar.Action
+                icon="close"
+                iconColor={theme.onBackground}
+                onPress={clearSelection}
+              />
+              <Appbar.Content
+                title={`${selected.length}`}
+                titleStyle={titleStyle}
+              />
+              <Appbar.Action
+                icon="select-all"
+                iconColor={theme.onBackground}
+                onPress={selectAll}
+              />
+            </Animated.View>
+          )}
+        </Portal>
+        <SafeAreaView excludeTop>
+          <Suspense fallback={<NovelScreenLoading theme={theme} />}>
+            <NovelScreenList
+              headerOpacity={headerOpacity}
+              listRef={chapterListRef}
+              navigation={navigation}
+              routeBaseNovel={route.params}
+              selected={selected}
+              setSelected={setSelected}
+              getNextChapterBatch={stableGetNextBatch}
+            />
+          </Suspense>
+        </SafeAreaView>
+
+        <Portal>
+          <Actionbar active={selected.length > 0} actions={actions} />
+          <Snackbar
+            visible={deleteDownloadsSnackbar.value}
+            onDismiss={deleteDownloadsSnackbar.setFalse}
+            action={snackbarAction}
+            theme={snackbarTheme}
+            style={styles.snackbar}
+          >
+            <Text style={snackbarTextStyle}>
+              {getString('novelScreen.deleteMessage')}
+            </Text>
+          </Snackbar>
+        </Portal>
+        <Portal>
+          {novel ? (
+            <>
+              <JumpToChapterModal
+                modalVisible={jumpToChapterModal}
+                hideModal={hideJumpToChapterModal}
+                novel={novel}
+                chapterListRef={chapterListRef}
+                navigation={navigation}
+                loadUpToBatch={loadUpToBatch}
+                totalChapters={batchInformation.totalChapters}
+                chapters={chapters}
+              />
+              <EditInfoModal
+                modalVisible={editInfoModal}
+                hideModal={hideEditInfoModal}
+                novel={novel}
+                setNovel={setNovel}
+                theme={theme}
+              />
+              <DownloadCustomChapterModal
+                modalVisible={dlChapterModalVisible}
+                hideModal={closeDlChapterModal}
                 novel={novel}
                 chapters={chapters}
-                deleteChapters={deleteChs}
-                downloadChapters={downloadChs}
-                showEditInfoModal={showEditInfoModal}
-                setCustomNovelCover={setCustomNovelCover}
-                downloadCustomChapterModal={openDlChapterModal}
-                showJumpToChapterModal={showJumpToChapterModal}
-                shareNovel={shareNovel}
                 theme={theme}
-                isLocal={novel?.isLocal ?? route.params?.isLocal}
-                goBack={navigation.goBack}
-                headerOpacity={headerOpacity}
+                downloadChapters={downloadChapters}
               />
-            ) : (
-              <Animated.View
-                entering={SlideInUp.duration(250)}
-                exiting={SlideOutUp.duration(250)}
-                style={styles.appbar}
-              >
-                <Appbar.Action
-                  icon="close"
-                  iconColor={theme.onBackground}
-                  onPress={() => setSelected([])}
-                />
-                <Appbar.Content
-                  title={`${selected.length}`}
-                  titleStyle={{ color: theme.onSurface }}
-                />
-                <Appbar.Action
-                  icon="select-all"
-                  iconColor={theme.onBackground}
-                  onPress={() => {
-                    setSelected(chapters);
-                  }}
-                />
-              </Animated.View>
-            )}
-          </Portal>
-          <SafeAreaView excludeTop>
-            <Suspense fallback={<NovelScreenLoading theme={theme} />}>
-              <NovelScreenList
-                headerOpacity={headerOpacity}
-                listRef={chapterListRef}
-                navigation={navigation}
-                openDrawer={openDrawer}
-                routeBaseNovel={route.params}
-                selected={selected}
-                setSelected={setSelected}
-                getNextChapterBatch={
-                  batchInformation.batch < batchInformation.total && !fetching
-                    ? getNextChapterBatch
-                    : noop
-                }
-              />
-            </Suspense>
-          </SafeAreaView>
-
-          <Portal>
-            <Actionbar active={selected.length > 0} actions={actions} />
-            <Snackbar
-              visible={deleteDownloadsSnackbar.value}
-              onDismiss={deleteDownloadsSnackbar.setFalse}
-              action={{
-                label: getString('common.delete'),
-                onPress: () => {
-                  deleteChapters(chapters.filter(c => c.isDownloaded));
-                },
-              }}
-              theme={{ colors: { primary: theme.primary } }}
-              style={styles.snackbar}
-            >
-              <Text style={{ color: theme.onSurface }}>
-                {getString('novelScreen.deleteMessage')}
-              </Text>
-            </Snackbar>
-          </Portal>
-          <Portal>
-            {novel && (
-              <>
-                <JumpToChapterModal
-                  modalVisible={jumpToChapterModal}
-                  hideModal={() => showJumpToChapterModal(false)}
-                  chapters={chapters}
-                  novel={novel}
-                  chapterListRef={chapterListRef}
-                  navigation={navigation}
-                />
-                <EditInfoModal
-                  modalVisible={editInfoModal}
-                  hideModal={() => showEditInfoModal(false)}
-                  novel={novel}
-                  setNovel={setNovel}
-                  theme={theme}
-                />
-                <DownloadCustomChapterModal
-                  modalVisible={dlChapterModalVisible}
-                  hideModal={closeDlChapterModal}
-                  novel={novel}
-                  chapters={chapters}
-                  theme={theme}
-                  downloadChapters={downloadChapters}
-                />
-              </>
-            )}
-          </Portal>
-        </View>
-      </Portal.Host>
-    </Drawer>
+            </>
+          ) : null}
+        </Portal>
+      </View>
+    </Portal.Host>
   );
 };
 
@@ -376,7 +392,6 @@ function createStyles(theme: ThemeColors) {
       width: '100%',
     },
     container: { flex: 1 },
-    drawer: { backgroundColor: 'transparent' },
     rowBack: {
       alignItems: 'center',
       flex: 1,

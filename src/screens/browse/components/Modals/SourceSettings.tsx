@@ -1,19 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { TextInput } from 'react-native-paper';
-import { Button, Modal } from '@components/index';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { TextInput, overlay } from 'react-native-paper';
+import { Button, Modal, SwitchItem, Checkbox, Menu } from '@components/index';
 import { useTheme } from '@hooks/persisted';
 import { getString } from '@strings/translations';
 import { Storage } from '@plugins/helpers/storage';
-
-interface PluginSetting {
-  value: string;
-  label: string;
-}
-
-interface PluginSettings {
-  [key: string]: PluginSetting;
-}
+import MaterialCommunityIcons from '@react-native-vector-icons/material-design-icons';
+import { PluginSettings } from '@plugins/types';
 
 interface SourceSettingsModal {
   visible: boolean;
@@ -34,7 +27,10 @@ const SourceSettingsModal: React.FC<SourceSettingsModal> = ({
 }) => {
   const theme = useTheme();
 
-  const [formValues, setFormValues] = useState<{ [key: string]: string }>({});
+  const [formValues, setFormValues] = useState<
+    Record<string, string | boolean | string[]>
+  >({});
+  const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (pluginSettings) {
@@ -63,12 +59,17 @@ const SourceSettingsModal: React.FC<SourceSettingsModal> = ({
     }
   }, [pluginSettings, pluginId]);
 
-  const handleChange = (key: string, value: string) => {
+  const handleChange = (key: string, value: string | boolean | string[]) => {
     setFormValues(prevValues => ({
       ...prevValues,
       [key]: value,
     }));
   };
+
+  const insertOrRemoveIntoArray = (array: string[], val: string): string[] =>
+    array.indexOf(val) > -1
+      ? array.filter(ele => ele !== val)
+      : [...array, val];
 
   const handleSave = () => {
     const storage = new Storage(pluginId);
@@ -97,22 +98,131 @@ const SourceSettingsModal: React.FC<SourceSettingsModal> = ({
         {title}
       </Text>
       <Text style={{ color: theme.onSurfaceVariant }}>{description}</Text>
-
-      {Object.entries(pluginSettings).map(([key, setting]) => (
-        <TextInput
-          key={key}
-          mode="outlined"
-          label={setting.label}
-          value={formValues[key] || ''}
-          onChangeText={value => handleChange(key, value)}
-          placeholder={`Enter ${setting.label}`}
-          placeholderTextColor={theme.onSurfaceDisabled}
-          underlineColor={theme.outline}
-          style={[{ color: theme.onSurface }, styles.textInput]}
-          theme={{ colors: { ...theme } }}
-        />
-      ))}
-
+      {Object.entries(pluginSettings).map(([key, setting]) => {
+        if (setting?.type === 'Switch') {
+          return (
+            <SwitchItem
+              key={key}
+              value={!!formValues[key]}
+              label={setting.label}
+              onPress={() => handleChange(key, !formValues[key])}
+              theme={theme}
+            />
+          );
+        }
+        if (setting?.type === 'Select') {
+          const selectedOption = setting.options.find(
+            opt => opt.value === formValues[key],
+          );
+          const isMenuOpen = !!openMenus[key];
+          return (
+            <View key={key} style={styles.selectContainer}>
+              <Menu
+                fullWidth
+                visible={isMenuOpen}
+                contentStyle={{ backgroundColor: theme.surfaceVariant }}
+                anchor={
+                  <Pressable
+                    onPress={() =>
+                      setOpenMenus(prev => ({ ...prev, [key]: !prev[key] }))
+                    }
+                  >
+                    <TextInput
+                      mode="outlined"
+                      label={
+                        <Text
+                          style={{
+                            color: isMenuOpen ? theme.primary : theme.onSurface,
+                            backgroundColor: overlay(2, theme.surface),
+                          }}
+                        >
+                          {` ${setting.label} `}
+                        </Text>
+                      }
+                      value={selectedOption?.label || ''}
+                      editable={false}
+                      theme={{ colors: { background: 'transparent' } }}
+                      outlineColor={
+                        isMenuOpen ? theme.primary : theme.onSurface
+                      }
+                      textColor={isMenuOpen ? theme.primary : theme.onSurface}
+                      pointerEvents="none"
+                    />
+                  </Pressable>
+                }
+                onDismiss={() =>
+                  setOpenMenus(prev => ({ ...prev, [key]: false }))
+                }
+              >
+                {setting.options.map(option => (
+                  <Menu.Item
+                    key={option.value}
+                    title={option.label}
+                    titleStyle={{ color: theme.onSurfaceVariant }}
+                    onPress={() => {
+                      handleChange(key, option.value);
+                      setOpenMenus(prev => ({ ...prev, [key]: false }));
+                    }}
+                  />
+                ))}
+              </Menu>
+            </View>
+          );
+        }
+        if (setting?.type === 'CheckboxGroup') {
+          const value = (formValues[key] || []) as string[];
+          const isExpanded = !!openMenus[key];
+          return (
+            <View key={key}>
+              <Pressable
+                style={styles.checkboxHeader}
+                onPress={() =>
+                  setOpenMenus(prev => ({ ...prev, [key]: !prev[key] }))
+                }
+                android_ripple={{ color: theme.rippleColor }}
+              >
+                <Text style={{ color: theme.onSurfaceVariant }}>
+                  {setting.label}
+                </Text>
+                <MaterialCommunityIcons
+                  name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                  color={theme.onSurface}
+                  size={24}
+                />
+              </Pressable>
+              {isExpanded &&
+                setting.options.map(option => (
+                  <Checkbox
+                    key={option.value}
+                    label={option.label}
+                    theme={theme}
+                    status={value.includes(option.value)}
+                    onPress={() =>
+                      handleChange(
+                        key,
+                        insertOrRemoveIntoArray(value, option.value),
+                      )
+                    }
+                  />
+                ))}
+            </View>
+          );
+        }
+        return (
+          <TextInput
+            key={key}
+            mode="outlined"
+            label={setting.label}
+            value={(formValues[key] ?? '') as string}
+            onChangeText={value => handleChange(key, value)}
+            placeholder={`Enter ${setting.label}`}
+            placeholderTextColor={theme.onSurfaceDisabled}
+            underlineColor={theme.outline}
+            style={[{ color: theme.onSurface }, styles.textInput]}
+            theme={{ colors: { ...theme } }}
+          />
+        );
+      })}
       <View style={styles.customCSSButtons}>
         <Button
           onPress={handleSave}
@@ -146,5 +256,15 @@ const styles = StyleSheet.create({
     height: 50,
     marginBottom: 8,
     marginTop: 16,
+  },
+  selectContainer: {
+    marginVertical: 8,
+  },
+  checkboxHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
   },
 });

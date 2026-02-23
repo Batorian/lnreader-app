@@ -3,7 +3,7 @@ import { enableFreeze } from 'react-native-screens';
 
 enableFreeze(true);
 
-import React from 'react';
+import React, { Suspense, useEffect } from 'react';
 import { StatusBar, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import LottieSplashScreen from 'react-native-lottie-splash-screen';
@@ -11,40 +11,54 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Provider as PaperProvider } from 'react-native-paper';
 import * as Notifications from 'expo-notifications';
 
-import { createTables } from '@database/db';
-import AppErrorBoundary from '@components/AppErrorBoundary/AppErrorBoundary';
+import AppErrorBoundary, {
+  ErrorFallback,
+} from '@components/AppErrorBoundary/AppErrorBoundary';
 
 import Main from './src/navigators/Main';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
+import { useInitDatabase } from '@database/db';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => {
     return {
-      shouldPlaySound: true,
-      shouldSetBadge: true,
+      shouldPlaySound: false,
+      shouldSetBadge: false,
       shouldShowBanner: true,
       shouldShowList: true,
     };
   },
 });
 
-createTables();
-LottieSplashScreen.hide();
 
 const App = () => {
+  const state = useInitDatabase();
+
+  useEffect(() => {
+    if (state.success || state.error) {
+      LottieSplashScreen.hide();
+    }
+  }, [state.success, state.error]);
+
+  if (state.error) {
+    return <ErrorFallback error={state.error} resetError={() => null} />;
+  }
+
   return (
-    <GestureHandlerRootView style={styles.flex}>
-      <AppErrorBoundary>
-        <SafeAreaProvider>
-          <PaperProvider>
-            <BottomSheetModalProvider>
-              <StatusBar translucent={true} backgroundColor="transparent" />
-              <Main />
-            </BottomSheetModalProvider>
-          </PaperProvider>
-        </SafeAreaProvider>
-      </AppErrorBoundary>
-    </GestureHandlerRootView>
+    <Suspense fallback={null}>
+      <GestureHandlerRootView style={styles.flex}>
+        <AppErrorBoundary>
+          <SafeAreaProvider>
+            <PaperProvider>
+              <BottomSheetModalProvider>
+                <StatusBar translucent={true} backgroundColor="transparent" />
+                <Main />
+              </BottomSheetModalProvider>
+            </PaperProvider>
+          </SafeAreaProvider>
+        </AppErrorBoundary>
+      </GestureHandlerRootView>
+    </Suspense>
   );
 };
 

@@ -1,172 +1,242 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, ToastAndroid } from 'react-native';
-import { overlay, Portal } from 'react-native-paper';
-import BottomSheet from '@components/BottomSheet/BottomSheet';
+import React, { useCallback, useMemo, useState } from 'react';
+import { ScrollView, StyleSheet, ToastAndroid, View } from 'react-native';
+import { Portal, overlay } from 'react-native-paper';
 
+import BottomSheet from '@components/BottomSheet/BottomSheet';
+import { useTheme, useTracker, useTrackedNovel } from '@hooks/persisted';
+import { TrackerName, UserListStatus } from '@services/Trackers';
+import { NovelInfo } from '@database/types';
+import { BottomSheetModalMethods } from '@gorhom/bottom-sheet/lib/typescript/types';
+import { TrackerMetadata } from '@hooks/persisted/useTracker';
+import { getStatusLabel, getTrackerIcon } from './constants';
+import { AddTrackingCard, TrackedItemCard } from './TrackerCards';
 import TrackSearchDialog from './TrackSearchDialog';
 import SetTrackStatusDialog from './SetTrackStatusDialog';
 import SetTrackScoreDialog from './SetTrackScoreDialog';
 import SetTrackChaptersDialog from './SetTrackChaptersDialog';
-import { AddTrackingCard, TrackedItemCard } from './TrackerCards';
-import { ThemeColors } from '@theme/types';
-import { BottomSheetModalMethods } from '@gorhom/bottom-sheet/lib/typescript/types';
-import { useTracker, useTrackedNovel } from '@hooks/persisted';
-import { UserListStatus } from '@services/Trackers';
-import { NovelInfo } from '@database/types';
 
-interface Props {
+interface TrackSheetProps {
   bottomSheetRef: React.RefObject<BottomSheetModalMethods | null>;
   novel: NovelInfo;
-  theme: ThemeColors;
 }
 
-const TrackSheet = ({ bottomSheetRef, novel, theme }: Props) => {
-  const { tracker } = useTracker();
-  const { trackedNovel, trackNovel, untrackNovel, updateTrackedNovel } =
-    useTrackedNovel(novel.id);
+const TrackSheet: React.FC<TrackSheetProps> = ({ bottomSheetRef, novel }) => {
+  const theme = useTheme();
+  const { getAuthenticatedTrackers } = useTracker();
+  const {
+    getTrackedNovel,
+    isTrackedOn,
+    trackNovelOn,
+    untrackNovelFrom,
+    updateTrackedNovel,
+  } = useTrackedNovel(novel.id);
 
+  const authenticatedTrackers = getAuthenticatedTrackers();
+
+  const [activeTracker, setActiveTracker] = useState<TrackerMetadata | null>(
+    null,
+  );
   const [trackSearchDialog, setTrackSearchDialog] = useState(false);
   const [trackStatusDialog, setTrackStatusDialog] = useState(false);
   const [trackChaptersDialog, setTrackChaptersDialog] = useState(false);
   const [trackScoreDialog, setTrackScoreDialog] = useState(false);
-  const handleSetSearchTrackDialog = () => {
+
+  const closeBottomSheet = useCallback(() => {
     bottomSheetRef.current?.close();
-    setTrackSearchDialog(true);
-  };
-  const handleSetStatusDialog = () => {
-    bottomSheetRef.current?.close();
-    setTrackStatusDialog(true);
-  };
-  const handleSetChaptersDialog = () => {
-    bottomSheetRef.current?.close();
-    setTrackChaptersDialog(true);
-  };
-  const handleSetScoreDialog = () => {
-    bottomSheetRef.current?.close();
-    setTrackScoreDialog(true);
-  };
-  if (!tracker) {
+  }, [bottomSheetRef]);
+
+  const handleSetSearchTrackDialog = useCallback(
+    (tracker: TrackerMetadata) => {
+      closeBottomSheet();
+      setActiveTracker(tracker);
+      setTrackSearchDialog(true);
+    },
+    [closeBottomSheet],
+  );
+
+  const handleSetStatusDialog = useCallback(
+    (tracker: TrackerMetadata) => {
+      setActiveTracker(tracker);
+      closeBottomSheet();
+      setTrackStatusDialog(true);
+    },
+    [closeBottomSheet],
+  );
+
+  const handleSetChaptersDialog = useCallback(
+    (tracker: TrackerMetadata) => {
+      setActiveTracker(tracker);
+      closeBottomSheet();
+      setTrackChaptersDialog(true);
+    },
+    [closeBottomSheet],
+  );
+
+  const handleSetScoreDialog = useCallback(
+    (tracker: TrackerMetadata) => {
+      setActiveTracker(tracker);
+      closeBottomSheet();
+      setTrackScoreDialog(true);
+    },
+    [closeBottomSheet],
+  );
+
+  const handleDismissSearchDialog = useCallback(() => {
+    setTrackSearchDialog(false);
+    setActiveTracker(null);
+  }, []);
+
+  const handleDismissStatusDialog = useCallback(() => {
+    setTrackStatusDialog(false);
+    setActiveTracker(null);
+  }, []);
+
+  const handleDismissChaptersDialog = useCallback(() => {
+    setTrackChaptersDialog(false);
+    setActiveTracker(null);
+  }, []);
+
+  const handleDismissScoreDialog = useCallback(() => {
+    setTrackScoreDialog(false);
+    setActiveTracker(null);
+  }, []);
+
+  const updateTrackChapters = useCallback(
+    (newChapters: string) => {
+      if (!activeTracker) return;
+
+      if (!newChapters) {
+        ToastAndroid.show('Enter a valid number', ToastAndroid.SHORT);
+        return;
+      }
+
+      const newProgress = Number(newChapters);
+      if (isNaN(newProgress)) {
+        ToastAndroid.show('Enter a valid number', ToastAndroid.SHORT);
+        return;
+      }
+
+      updateTrackedNovel(activeTracker, { progress: newProgress });
+    },
+    [activeTracker, updateTrackedNovel],
+  );
+
+  const updateTrackStatus = useCallback(
+    (newStatus: UserListStatus) => {
+      if (!activeTracker) return;
+      updateTrackedNovel(activeTracker, { status: newStatus });
+    },
+    [activeTracker, updateTrackedNovel],
+  );
+
+  const updateTrackScore = useCallback(
+    (newScore: number) => {
+      if (!activeTracker) return;
+      updateTrackedNovel(activeTracker, { score: newScore });
+    },
+    [activeTracker, updateTrackedNovel],
+  );
+
+  const handleUntrack = useCallback(
+    (trackerName: TrackerName) => {
+      untrackNovelFrom(trackerName);
+    },
+    [untrackNovelFrom],
+  );
+
+  const snapPoints = useMemo(() => {
+    const trackerCount = authenticatedTrackers.length;
+    if (trackerCount === 0) return [130];
+
+    // Base height + (number of trackers * card height)
+    // Card height ~130px for add card, ~180px for tracked card
+    const hasAnyTracked = authenticatedTrackers.some(t => isTrackedOn(t.name));
+    const cardHeight = hasAnyTracked ? 180 : 130;
+    const totalHeight = 50 + trackerCount * cardHeight;
+
+    return [Math.min(totalHeight, 600)]; // Cap at 600px
+  }, [authenticatedTrackers, isTrackedOn]);
+
+  if (authenticatedTrackers.length === 0) {
     return null;
   }
 
-  const getStatus = (status: string) => {
-    switch (status) {
-      case 'CURRENT':
-        return 'Reading';
-      case 'PLANNING':
-        return 'Plan to read';
-      case 'COMPLETED':
-        return 'Completed';
-      case 'DROPPED':
-        return 'Dropped';
-      case 'PAUSED':
-        return 'On Hold';
-      case 'REPEATING':
-        return 'Rereading';
-    }
-  };
-
-  const updateTrackChapters = (newChapters: string) => {
-    if (newChapters !== '') {
-      const newProgress = Number(newChapters);
-      updateTrackedNovel(tracker, { progress: newProgress });
-
-      setTrackChaptersDialog(false);
-    } else {
-      ToastAndroid.show('Enter a valid number', ToastAndroid.SHORT);
-    }
-  };
-
-  const updateTrackStatus = (newStatus: UserListStatus) => {
-    updateTrackedNovel(tracker, { status: newStatus });
-    setTrackStatusDialog(false);
-  };
-
-  const updateTrackScore = (newScore: number) => {
-    updateTrackedNovel(tracker, { score: newScore });
-    setTrackScoreDialog(false);
-  };
-
   return (
     <>
-      <BottomSheet
-        bottomSheetRef={bottomSheetRef}
-        snapPoints={trackedNovel ? [180] : [130]}
-      >
-        <View
+      <BottomSheet bottomSheetRef={bottomSheetRef} snapPoints={snapPoints}>
+        <ScrollView
           style={[
             styles.contentContainer,
             { backgroundColor: overlay(2, theme.surface) },
           ]}
         >
-          {!trackedNovel ? (
-            tracker.name === 'MyAnimeList' ? (
-              <AddTrackingCard
-                icon={require('../../../../../assets/mal.png')}
-                theme={theme}
-                setTrackSearchDialog={handleSetSearchTrackDialog}
-              />
-            ) : (
-              <AddTrackingCard
-                icon={require('../../../../../assets/anilist.png')}
-                theme={theme}
-                setTrackSearchDialog={handleSetSearchTrackDialog}
-              />
-            )
-          ) : (
-            <TrackedItemCard
-              untrackNovel={untrackNovel}
-              tracker={tracker}
-              icon={
-                tracker?.name === 'MyAnimeList'
-                  ? require('../../../../../assets/mal.png')
-                  : require('../../../../../assets/anilist.png')
-              }
-              trackItem={trackedNovel}
-              handSetTrackStatusDialog={handleSetStatusDialog}
-              handleSetTrackChaptersDialog={handleSetChaptersDialog}
-              handleSetTrackScoreDialog={handleSetScoreDialog}
-              theme={theme}
-              getStatus={getStatus}
-            />
-          )}
-        </View>
+          {authenticatedTrackers.map(tracker => {
+            const trackerIcon = getTrackerIcon(tracker.name);
+            const trackedNovel = getTrackedNovel(tracker.name);
+
+            if (!trackerIcon) return null;
+
+            return (
+              <View key={tracker.name} style={styles.trackerCardContainer}>
+                {!trackedNovel ? (
+                  <AddTrackingCard
+                    icon={trackerIcon}
+                    onPress={() => handleSetSearchTrackDialog(tracker)}
+                  />
+                ) : (
+                  <TrackedItemCard
+                    onUntrack={() => handleUntrack(tracker.name)}
+                    tracker={tracker}
+                    icon={trackerIcon}
+                    trackItem={trackedNovel}
+                    onSetStatus={() => handleSetStatusDialog(tracker)}
+                    onSetChapters={() => handleSetChaptersDialog(tracker)}
+                    onSetScore={() => handleSetScoreDialog(tracker)}
+                    getStatus={getStatusLabel}
+                  />
+                )}
+              </View>
+            );
+          })}
+        </ScrollView>
       </BottomSheet>
       <Portal>
-        {trackedNovel ? (
+        {activeTracker && (
           <>
-            <SetTrackStatusDialog
-              trackItem={trackedNovel}
-              trackStatusDialog={trackStatusDialog}
-              setTrackStatusDialog={setTrackStatusDialog}
-              updateTrackStatus={updateTrackStatus}
-              theme={theme}
-            />
-            <SetTrackChaptersDialog
-              trackItem={trackedNovel}
-              trackChaptersDialog={trackChaptersDialog}
-              setTrackChaptersDialog={setTrackChaptersDialog}
-              updateTrackChapters={updateTrackChapters}
-              theme={theme}
-            />
-            <SetTrackScoreDialog
-              tracker={tracker}
-              trackItem={trackedNovel}
-              trackScoreDialog={trackScoreDialog}
-              setTrackScoreDialog={setTrackScoreDialog}
-              updateTrackScore={updateTrackScore}
-              theme={theme}
-            />
+            {getTrackedNovel(activeTracker.name) ? (
+              <>
+                <SetTrackStatusDialog
+                  tracker={activeTracker}
+                  trackItem={getTrackedNovel(activeTracker.name)!}
+                  visible={trackStatusDialog}
+                  onDismiss={handleDismissStatusDialog}
+                  onUpdateStatus={updateTrackStatus}
+                />
+                <SetTrackChaptersDialog
+                  tracker={activeTracker}
+                  trackItem={getTrackedNovel(activeTracker.name)!}
+                  visible={trackChaptersDialog}
+                  onDismiss={handleDismissChaptersDialog}
+                  onUpdateChapters={updateTrackChapters}
+                />
+                <SetTrackScoreDialog
+                  tracker={activeTracker}
+                  trackItem={getTrackedNovel(activeTracker.name)!}
+                  visible={trackScoreDialog}
+                  onDismiss={handleDismissScoreDialog}
+                  onUpdateScore={updateTrackScore}
+                />
+              </>
+            ) : (
+              <TrackSearchDialog
+                tracker={activeTracker}
+                onTrackNovel={trackNovelOn}
+                visible={trackSearchDialog}
+                onDismiss={handleDismissSearchDialog}
+                novelName={novel.name}
+              />
+            )}
           </>
-        ) : (
-          <TrackSearchDialog
-            tracker={tracker}
-            trackNovel={trackNovel}
-            trackSearchDialog={trackSearchDialog}
-            setTrackSearchDialog={setTrackSearchDialog}
-            novelName={novel.name}
-            theme={theme}
-          />
         )}
       </Portal>
     </>
@@ -178,5 +248,8 @@ export default TrackSheet;
 const styles = StyleSheet.create({
   contentContainer: {
     flex: 1,
+  },
+  trackerCardContainer: {
+    marginBottom: 8,
   },
 });

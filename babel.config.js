@@ -31,13 +31,19 @@ module.exports = function (api) {
           },
         },
       ],
-      'react-native-reanimated/plugin',
+      'react-native-worklets/plugin',
       [
         'module:react-native-dotenv',
         {
           envName: 'APP_ENV',
           moduleName: '@env',
           path: '.env',
+        },
+      ],
+      [
+        'inline-import',
+        {
+          extensions: ['.sql'],
         },
       ],
     ],

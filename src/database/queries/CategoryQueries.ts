@@ -1,122 +1,244 @@
-import * as SQLite from 'expo-sqlite';
+import { eq, sql, inArray, and, ne, count } from 'drizzle-orm';
 import { BackupCategory, Category, NovelCategory, CCategory } from '../types';
 import { showToast } from '@utils/showToast';
 import { getString } from '@strings/translations';
-import { db } from '@database/db';
-import { getAllSync, runSync } from '@database/utils/helpers';
+import { dbManager } from '@database/db';
+import {
+  categorySchema,
+  novelCategorySchema,
+  type CategoryRow,
+} from '@database/schema';
 
-const getCategoriesQuery = `
-    SELECT 
-        Category.id, 
-        Category.name, 
-        Category.sort, 
-        GROUP_CONCAT(NovelCategory.novelId ORDER BY NovelCategory.novelId) AS novelIds
-    FROM Category 
-    LEFT JOIN NovelCategory ON NovelCategory.categoryId = Category.id 
-    GROUP BY Category.id, Category.name, Category.sort
-    ORDER BY Category.sort;
-	`;
-
-type NumberList = `${number}` | `${number},${number}` | undefined;
-export const getCategoriesFromDb = () => {
-  return getAllSync<Category & { novelIds: NumberList }>([getCategoriesQuery]);
-};
-
-export const getCategoriesWithCount = (novelIds: number[]) => {
-  const getCategoriesWithCountQuery = `
-  SELECT *, novelsCount 
-  FROM Category LEFT JOIN 
-  (
-    SELECT categoryId, COUNT(novelId) as novelsCount 
-    FROM NovelCategory WHERE novelId in (${novelIds.join(
-      ',',
-    )}) GROUP BY categoryId 
-  ) as NC ON Category.id = NC.categoryId
-  WHERE Category.id != 2
-  ORDER BY sort
-	`;
-  return getAllSync<CCategory>([getCategoriesWithCountQuery]);
-};
-
-const createCategoryQuery = 'INSERT INTO Category (name) VALUES (?)';
-
-export const createCategory = (categoryName: string): void =>
-  runSync([[createCategoryQuery, [categoryName]]]);
-
-const beforeDeleteCategoryQuery = `
-    UPDATE NovelCategory SET categoryId = (SELECT id FROM Category WHERE sort = 1)
-    WHERE novelId IN (
-      SELECT novelId FROM NovelCategory
-      GROUP BY novelId
-      HAVING COUNT(categoryId) = 1
+/**
+ * Get all categories with their novel IDs using Drizzle ORM
+ */
+export const getCategoriesFromDb = async (): Promise<
+  Array<CategoryRow & { novelIds: string | null }>
+> => {
+  return await dbManager
+    .select({
+      id: categorySchema.id,
+      name: categorySchema.name,
+      sort: categorySchema.sort,
+      novelIds: sql<
+        string | null
+      >`GROUP_CONCAT(${novelCategorySchema.novelId} ORDER BY ${novelCategorySchema.novelId})`,
+    })
+    .from(categorySchema)
+    .leftJoin(
+      novelCategorySchema,
+      eq(novelCategorySchema.categoryId, categorySchema.id),
     )
-    AND categoryId = ?;
-`;
-const deleteCategoryQuery = 'DELETE FROM Category WHERE id = ?';
+    .groupBy(categorySchema.id, categorySchema.name, categorySchema.sort)
+    .orderBy(categorySchema.sort)
+    .all();
+};
 
-export const deleteCategoryById = (category: Category): void => {
-  if (category.sort === 1 || category.id === 2) {
+/**
+ * Get categories with novel count for the specified novels
+ */
+export const getCategoriesWithCount = async (
+  novelIds: number[],
+): Promise<CCategory[]> => {
+  if (!novelIds.length) {
+    return await dbManager
+      .select({
+        id: categorySchema.id,
+        name: categorySchema.name,
+        sort: categorySchema.sort,
+        novelsCount: sql<number>`0`,
+      })
+      .from(categorySchema)
+      .where(ne(categorySchema.id, 2))
+      .orderBy(categorySchema.sort)
+      .all();
+  }
+
+  // Use subquery to count novels per category
+  const result = await dbManager.transaction(async tx => {
+    const subquery = tx
+      .select({
+        categoryId: novelCategorySchema.categoryId,
+        novelsCount: count(novelCategorySchema.novelId).as('novelsCount'),
+      })
+      .from(novelCategorySchema)
+      .where(inArray(novelCategorySchema.novelId, novelIds))
+      .groupBy(novelCategorySchema.categoryId)
+      .as('NC');
+
+    const r = await tx
+      .select({
+        id: categorySchema.id,
+        name: categorySchema.name,
+        sort: categorySchema.sort,
+        novelsCount: sql<number>`COALESCE(${subquery.novelsCount}, 0)`,
+      })
+      .from(categorySchema)
+      .leftJoin(subquery, eq(categorySchema.id, subquery.categoryId))
+      .where(ne(categorySchema.id, 2))
+      .orderBy(categorySchema.sort);
+
+    return r;
+  });
+
+  return result;
+};
+
+/**
+ * Create a new category using Drizzle ORM
+ */
+export const createCategory = async (
+  categoryName: string,
+): Promise<CategoryRow> => {
+  return await dbManager.write(async tx => {
+    const categoryCount = await tx.$count(categorySchema);
+    const row = await tx
+      .insert(categorySchema)
+      .values({ name: categoryName, sort: categoryCount + 1 })
+      .returning()
+      .get();
+    return row;
+  });
+};
+
+/**
+ * Delete a category by ID with proper handling of novels
+ * Before deletion, reassigns novels that only belong to this category to the default category
+ */
+export const deleteCategoryById = async (category: Category): Promise<void> => {
+  if (category.id <= 2) {
     return showToast(getString('categories.cantDeleteDefault'));
   }
-  runSync([
-    [beforeDeleteCategoryQuery, [category.id]],
-    [deleteCategoryQuery, [category.id]],
-  ]);
+
+  await dbManager.write(async tx => {
+    const defaultCategoryId = 1;
+
+    // Find novels that only belong to this category
+    const novelsWithOnlyThisCategory = await tx
+      .select({ novelId: novelCategorySchema.novelId })
+      .from(novelCategorySchema)
+      .groupBy(novelCategorySchema.novelId)
+      .having(sql`COUNT(${novelCategorySchema.categoryId}) = 1`)
+      .all();
+
+    const novelIds = novelsWithOnlyThisCategory.map(row => row.novelId);
+
+    // Update those novels to belong to the default category
+    if (novelIds.length > 0) {
+      await tx
+        .update(novelCategorySchema)
+        .set({ categoryId: defaultCategoryId })
+        .where(
+          and(
+            inArray(novelCategorySchema.novelId, novelIds),
+            eq(novelCategorySchema.categoryId, category.id),
+          ),
+        )
+        .run();
+    }
+
+    // Delete the category
+    await tx
+      .delete(categorySchema)
+      .where(eq(categorySchema.id, category.id))
+      .run();
+  });
 };
 
-const updateCategoryQuery = 'UPDATE Category SET name = ? WHERE id = ?';
-
-export const updateCategory = (
+/**
+ * Update a category name using Drizzle ORM
+ */
+export const updateCategory = async (
   categoryId: number,
   categoryName: string,
-): void => runSync([[updateCategoryQuery, [categoryName, categoryId]]]);
-
-const isCategoryNameDuplicateQuery = `
-  SELECT COUNT(*) as isDuplicate FROM Category WHERE name = ?
-	`;
-
-export const isCategoryNameDuplicate = (categoryName: string): boolean => {
-  const res = db.getFirstSync(isCategoryNameDuplicateQuery, [categoryName]);
-
-  if (res instanceof Object && 'isDuplicate' in res) {
-    return Boolean(res.isDuplicate);
-  } else {
-    throw 'isCategoryNameDuplicate return type does not match.';
-  }
+): Promise<void> => {
+  await dbManager.write(async tx => {
+    await tx
+      .update(categorySchema)
+      .set({ name: categoryName })
+      .where(eq(categorySchema.id, categoryId));
+  });
 };
 
-const updateCategoryOrderQuery = 'UPDATE Category SET sort = ? WHERE id = ?';
+/**
+ * Check if a category name already exists using Drizzle ORM
+ */
+export const isCategoryNameDuplicate = (categoryName: string): boolean => {
+  const result = dbManager.getSync(
+    dbManager
+      .select({ id: categorySchema.id })
+      .from(categorySchema)
+      .where(eq(categorySchema.name, categoryName)),
+  );
 
-export const updateCategoryOrderInDb = (categories: Category[]): void => {
-  // Do not set local as default one
-  if (categories.length && categories[0].id === 2) {
+  return !!result;
+};
+
+/**
+ * Update the sort order of categories
+ */
+export const updateCategoryOrderInDb = async (
+  categories: Category[],
+): Promise<void> => {
+  if (!categories.length) {
     return;
   }
-  runSync(
-    categories.map(c => {
-      return [updateCategoryOrderQuery, [c.sort, c.id]];
-    }),
-  );
+
+  await dbManager.write(async tx => {
+    for (const category of categories) {
+      tx.update(categorySchema)
+        .set({ sort: category.sort })
+        .where(eq(categorySchema.id, category.id))
+        .run();
+    }
+  });
 };
 
-export const getAllNovelCategories = () =>
-  getAllSync<NovelCategory>(['SELECT * FROM NovelCategory']);
+/**
+ * Get all novel-category associations
+ */
+export const getAllNovelCategories = async (): Promise<NovelCategory[]> => {
+  return await dbManager.select().from(novelCategorySchema).all();
+};
 
-export const _restoreCategory = (category: BackupCategory) => {
-  const d = category.novelIds.map(novelId => [
-    'INSERT INTO NovelCategory (categoryId, novelId) VALUES (?, ?)',
-    [category.id, novelId],
-  ]) as Array<[string, SQLite.SQLiteBindParams]>;
+/**
+ * Restore a category from backup
+ * Used during the restore process
+ */
+export const _restoreCategory = async (
+  category: BackupCategory,
+): Promise<void> => {
+  await dbManager.write(async tx => {
+    // Delete existing category with same id or sort
+    await tx
+      .delete(categorySchema)
+      .where(
+        sql`${categorySchema.id} = ${category.id} OR ${categorySchema.sort} = ${category.sort}`,
+      )
+      .run();
 
-  runSync([
-    [
-      'DELETE FROM Category WHERE id = ? OR sort = ?',
-      [category.id, category.sort],
-    ],
-    [
-      'INSERT INTO Category (id, name, sort) VALUES (?, ?, ?)',
-      [category.id, category.name, category.sort],
-    ],
-    ...d,
-  ]);
+    // Insert the category
+    await tx
+      .insert(categorySchema)
+      .values({
+        id: category.id,
+        name: category.name,
+        sort: category.sort,
+      })
+      .onConflictDoNothing()
+      .run();
+
+    // Insert novel-category associations
+    if (category.novelIds && category.novelIds.length > 0) {
+      for (const novelId of category.novelIds) {
+        tx.insert(novelCategorySchema)
+          .values({
+            categoryId: category.id,
+            novelId: novelId,
+          })
+          .onConflictDoNothing()
+          .run();
+      }
+    }
+  });
 };

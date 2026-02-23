@@ -81,4 +81,15 @@ web-build/
 .vscode/
 src/sources/en/generators/
 *.lockb
+*.lock
+!pnpm-lock.yaml
 .tool-versions
+flake.lock
+
+# pnpm
+.pnpm-store
+
+.cursor/
+.agents/
+.claude/
+.jj/

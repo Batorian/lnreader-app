@@ -10,6 +10,7 @@ import { useBackHandler } from '@hooks/index';
 import { BottomSheetModalMethods } from '@gorhom/bottom-sheet/lib/typescript/types';
 import BottomSheetBackdrop from './BottomSheetBackdrop';
 import { useWindowDimensions } from 'react-native';
+import { useTheme } from '@hooks/persisted';
 
 interface BottomSheetProps
   extends Omit<BottomSheetModalProps, 'ref' | 'onChange' | 'snapPoints'> {
@@ -17,6 +18,33 @@ interface BottomSheetProps
   onChange?: (index: number) => void;
   snapPoints?: number[];
 }
+
+// const MD3DragHandle = () => {
+//   const theme = useTheme();
+//   return (
+//     <View style={[handleStyles.container, { backgroundColor: theme.surface }]}>
+//       <View
+//         style={[
+//           handleStyles.handle,
+//           { backgroundColor: theme.onSurfaceVariant },
+//         ]}
+//       />
+//     </View>
+//   );
+// };
+
+// const handleStyles = StyleSheet.create({
+//   container: {
+//     alignItems: 'center',
+//     paddingVertical: 12,
+//   },
+//   handle: {
+//     width: 32,
+//     height: 4,
+//     borderRadius: 2,
+//     opacity: 0.4,
+//   },
+// });
 
 const BottomSheet: React.FC<BottomSheetProps> = ({
   bottomSheetRef,
@@ -29,6 +57,7 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
   const indexRef = useRef<number>(null);
   const { bottom, top } = useSafeAreaInsets();
   const { height } = useWindowDimensions();
+  const theme = useTheme();
   const renderBackdrop = useCallback(
     (backdropProps: BottomSheetBackdropProps) => (
       <BottomSheetBackdrop {...backdropProps} />
@@ -61,6 +90,11 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
       ref={bottomSheetRef}
       backdropComponent={renderBackdrop}
       handleComponent={null}
+      backgroundStyle={{
+        borderTopLeftRadius: 28,
+        borderTopRightRadius: 28,
+        backgroundColor: theme.surface,
+      }}
       containerStyle={[{ paddingBottom: bottom }, containerStyle]}
       onChange={index => {
         onChange?.(index);

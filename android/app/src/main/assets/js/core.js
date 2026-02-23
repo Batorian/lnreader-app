@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 window.reader = new (function () {
   const {
     readerSettings,
@@ -5,6 +6,7 @@ window.reader = new (function () {
     novel,
     chapter,
     nextChapter,
+    prevChapter,
     batteryLevel,
     autoSaveInterval,
     DEBUG,
@@ -24,6 +26,7 @@ window.reader = new (function () {
   this.novel = novel;
   this.chapter = chapter;
   this.nextChapter = nextChapter;
+  this.prevChapter = prevChapter;
   this.strings = strings;
   this.autoSaveInterval = autoSaveInterval;
   this.rawHTML = this.chapterElement.innerHTML;
@@ -38,6 +41,9 @@ window.reader = new (function () {
   this.chapterHeight = this.chapterElement.scrollHeight + this.paddingTop;
   this.layoutHeight = window.screen.height;
   this.layoutWidth = window.screen.width;
+
+  this.layoutEvent = undefined;
+  this.chapterEndingVisible = van.state(false);
 
   this.post = obj => window.ReactNativeWebView.postMessage(JSON.stringify(obj));
   this.refresh = () => {
@@ -93,7 +99,7 @@ window.reader = new (function () {
     }
   });
 
-  setInterval(() => {
+  document.onscrollend = () => {
     if (!this.generalSettings.val.pageReader) {
       this.post({
         type: 'save',
@@ -102,17 +108,11 @@ window.reader = new (function () {
           10,
         ),
       });
-    } else {
-      this.post({
-        type: 'save',
-        data: parseInt(
-          ((pageReader.page.val + 1) / pageReader.totalPages.val) * 100,
-        ),
-      });
     }
-  }, this.autoSaveInterval);
+  };
 
   if (DEBUG) {
+    // eslint-disable-next-line no-global-assign, no-new-object
     console = new Object();
     console.log = function (...data) {
       reader.post({ 'type': 'console', 'msg': data?.join(' ') });
@@ -140,9 +140,13 @@ window.tts = new (function () {
   this.currentElement = reader.chapterElement;
   this.started = false;
   this.reading = false;
+  this.elementsRead = 0;
+  this.totalElements = 0;
+  this.allReadableElements = []; // Store all readable elements at start
+  this.textQueue = []; // Flat list of normalized text for native fallback
 
   this.readable = element => {
-    ele = element ?? this.currentElement;
+    const ele = element ?? this.currentElement;
     if (
       ele.nodeName !== 'SPAN' &&
       this.readableNodeNames.includes(ele.nodeName)
@@ -160,12 +164,32 @@ window.tts = new (function () {
     return true;
   };
 
+  this.normalizeText = text => {
+    if (!text) return '';
+    return text
+      .replace(/\s+/g, ' ')
+      .replace(/\s*([.,!?;:])\s*/g, '$1 ')
+      .trim();
+  };
+
   // if can find a readable node, else stop tts
-  this.findNextTextNode = () => {
+  // FIXED: Added proper boundary checks to prevent stack overflow
+  this.findNextTextNode = (depth = 0) => {
+    // Prevent deep recursion
+    if (depth > 500) {
+      console.warn('TTS: findNextTextNode max depth reached');
+      return false;
+    }
+
     if (this.currentElement.isSameNode(reader.chapterElement) && this.started) {
       return false;
     } else {
       this.started = true;
+    }
+
+    // Safety check: ensure currentElement is valid
+    if (!this.currentElement || !this.currentElement.nodeName) {
+      return false;
     }
 
     // is read, have to go next or go back
@@ -173,10 +197,17 @@ window.tts = new (function () {
       this.prevElement = this.currentElement;
       if (this.currentElement.nextElementSibling) {
         this.currentElement = this.currentElement.nextElementSibling;
-      } else {
+        return this.findNextTextNode(depth + 1);
+      } else if (
+        this.currentElement.parentElement &&
+        !this.currentElement.parentElement.isSameNode(document.body) &&
+        !this.currentElement.parentElement.isSameNode(document.documentElement)
+      ) {
         this.currentElement = this.currentElement.parentElement;
+        return this.findNextTextNode(depth + 1);
+      } else {
+        return false;
       }
-      return this.findNextTextNode();
     } else {
       // can read? read it
       if (this.readable()) {
@@ -189,38 +220,116 @@ window.tts = new (function () {
         // go deep
         this.prevElement = this.currentElement;
         this.currentElement = this.currentElement.firstElementChild;
+        return this.findNextTextNode(depth + 1);
       } else if (this.currentElement.nextElementSibling) {
         this.prevElement = this.currentElement;
         this.currentElement = this.currentElement.nextElementSibling;
-      } else {
+        return this.findNextTextNode(depth + 1);
+      } else if (
+        this.currentElement.parentElement &&
+        !this.currentElement.parentElement.isSameNode(document.body) &&
+        !this.currentElement.parentElement.isSameNode(document.documentElement)
+      ) {
         this.prevElement = this.currentElement;
         this.currentElement = this.currentElement.parentElement;
+        return this.findNextTextNode(depth + 1);
+      } else {
+        return false;
       }
-      return this.findNextTextNode();
     }
   };
 
   this.next = () => {
     try {
       this.currentElement?.classList?.remove('highlight');
-      if (this.findNextTextNode()) {
-        this.reading = true;
-        this.speak();
+
+      // Use array-based approach instead of DOM traversal (no recursion!)
+      while (this.elementsRead < this.totalElements) {
+        const nextElement = this.allReadableElements[this.elementsRead];
+        if (!nextElement) break;
+
+        const text = this.normalizeText(nextElement.innerText);
+        if (text) {
+          // Found valid text - speak it
+          this.currentElement = nextElement;
+          this.reading = true;
+          this.elementsRead++;
+          this.speak();
+          return;
+        } else {
+          // Empty text, skip to next in array (no recursion!)
+          this.elementsRead++;
+        }
+      }
+
+      // Reached the end (elementsRead >= totalElements or no more valid elements)
+      this.reading = false;
+      const autoPageAdvance =
+        reader.readerSettings.val.tts?.autoPageAdvance === true;
+      const hasNextChapter = !!reader.nextChapter;
+
+      if (autoPageAdvance && hasNextChapter) {
+        reader.post({ type: 'next', autoStartTTS: true });
       } else {
-        this.reading = false;
         this.stop();
-        document.getElementById('TTS-Controller').firstElementChild.innerHTML =
-          volumnIcon;
+        const controller = document.getElementById('TTS-Controller');
+        if (controller?.firstElementChild) {
+          controller.firstElementChild.innerHTML = volumnIcon;
+        }
       }
     } catch (e) {
-      alert(e);
+      this.stop();
+      alert('TTS Error: ' + e.message);
     }
   };
 
   this.start = element => {
     this.stop();
-    this.currentElement = element ?? reader.chapterElement;
+    this.started = true;
+    const startElement = element ?? reader.chapterElement;
+    this.currentElement = startElement;
+
+    // Get all readable elements from the chapter
+    this.allReadableElements = this.getAllReadableElements(
+      reader.chapterElement,
+    );
+    this.totalElements = this.allReadableElements.length;
+    this.textQueue = this.allReadableElements
+      .map(el => this.normalizeText(el.innerText))
+      .filter(text => !!text);
+    reader.post({
+      type: 'tts-queue',
+      data: {
+        queue: this.textQueue,
+        startIndex: this.elementsRead,
+      },
+    });
+
+    // If starting from a specific element, count how many are before it
+    if (element && element !== reader.chapterElement) {
+      const startIndex = this.allReadableElements.indexOf(element);
+      this.elementsRead = startIndex >= 0 ? startIndex : 0;
+    } else {
+      this.elementsRead = 0;
+    }
+
     this.next();
+  };
+
+  // Get all readable elements in order
+  this.getAllReadableElements = element => {
+    const elements = [];
+    const traverse = el => {
+      if (!el) return;
+      if (this.readable(el)) {
+        elements.push(el);
+      }
+      for (let i = 0; i < el.children.length; i++) {
+        traverse(el.children[i]);
+      }
+    };
+    traverse(element);
+    return elements;
   };
 
   this.resume = () => {
@@ -239,7 +348,27 @@ window.tts = new (function () {
 
   this.pause = () => {
     this.reading = false;
-    reader.post({ type: 'stop-speak' });
+    reader.post({ type: 'pause-speak' });
+    reader.post({ type: 'tts-state', data: { isReading: false } });
+  };
+
+  this.rewind = () => {
+    if (!this.started || !this.currentElement) return;
+    reader.post({ type: 'pause-speak' });
+    this.reading = true;
+    this.speak();
+  };
+
+  this.seekTo = index => {
+    if (!this.started || !this.allReadableElements.length) return;
+    const targetIndex = Math.max(0, Math.min(index, this.totalElements - 1));
+    reader.post({ type: 'pause-speak' });
+    this.currentElement?.classList?.remove('highlight');
+    this.elementsRead = targetIndex;
+    this.currentElement = this.allReadableElements[targetIndex];
+    this.reading = true;
+    this.elementsRead++;
+    this.speak();
   };
 
   this.stop = () => {
@@ -249,30 +378,182 @@ window.tts = new (function () {
     this.currentElement = reader.chapterElement;
     this.started = false;
     this.reading = false;
+    this.elementsRead = 0;
+    this.totalElements = 0;
+    this.allReadableElements = [];
+    this.textQueue = [];
+    reader.post({ type: 'tts-state', data: { isReading: false } });
+    // Ensure icon updates to stopped state
+    const controller = document.getElementById('TTS-Controller');
+    if (controller?.firstElementChild) {
+      controller.firstElementChild.innerHTML = volumnIcon;
+    }
+  };
+
+  this.isElementInViewport = element => {
+    if (!element) return false;
+    const rect = element.getBoundingClientRect();
+    const windowHeight =
+      window.innerHeight || document.documentElement.clientHeight;
+    const windowWidth =
+      window.innerWidth || document.documentElement.clientWidth;
+
+    return (
+      rect.top >= 0 &&
+      rect.left >= 0 &&
+      rect.bottom <= windowHeight &&
+      rect.right <= windowWidth
+    );
+  };
+
+  // UPDATED: Scroll to top or center based on settings with padding for notch/camera
+  this.scrollToElement = element => {
+    if (!element) return;
+    // Check if element is partially visible (at least some part is in viewport)
+    const rect = element.getBoundingClientRect();
+    const windowHeight =
+      window.innerHeight || document.documentElement.clientHeight;
+    const isPartiallyVisible =
+      rect.top < windowHeight &&
+      rect.bottom > 0 &&
+      rect.left < window.innerWidth &&
+      rect.right > 0;
+
+    // Only scroll if element is not visible or barely visible
+    if (!isPartiallyVisible || rect.top < 0 || rect.bottom > windowHeight) {
+      // Check scrollToTop setting (default to true for better reading experience)
+      const scrollToTop = reader.readerSettings.val.tts?.scrollToTop !== false;
+
+      if (scrollToTop) {
+        // Scroll to top with padding for notch/camera (80px from top)
+        const elementTop =
+          element.getBoundingClientRect().top + window.pageYOffset;
+        const offsetPosition = elementTop - 80; // 80px padding for notch/camera
+
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: 'smooth',
+        });
+      } else {
+        // Center scroll (original behavior)
+        element.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+          inline: 'nearest',
+        });
+      }
+    }
   };
 
   this.speak = () => {
+    if (!this.currentElement) return;
     this.prevElement = this.currentElement;
+    this.scrollToElement(this.currentElement);
     this.currentElement.classList.add('highlight');
-    reader.post({ type: 'speak', data: this.currentElement?.innerText });
+    const text = this.normalizeText(this.currentElement.innerText);
+    if (text) {
+      reader.post({
+        type: 'speak',
+        data: text,
+        index: this.elementsRead - 1,
+        total: this.totalElements,
+      });
+      reader.post({ type: 'tts-state', data: { isReading: true } });
+    } else {
+      this.next();
+    }
   };
 })();
+
+// Watch for TTSEnable changes and stop TTS when disabled
+van.derive(() => {
+  if (!reader.generalSettings.val.TTSEnable && window.tts) {
+    if (tts.reading || tts.started) {
+      tts.stop();
+    }
+  }
+});
 
 window.pageReader = new (function () {
   this.page = van.state(0);
   this.totalPages = van.state(0);
+  this.chapterEndingVisible = van.state(
+    initialPageReaderConfig.nextChapterScreenVisible,
+  );
+  this.chapterEnding = document.getElementsByClassName('transition-chapter')[0];
+
+  this.showChapterEnding = (bool, instant, left) => {
+    if (!this.chapterEnding) {
+      this.chapterEnding =
+        document.getElementsByClassName('transition-chapter')[0];
+      if (!this.chapterEnding) return;
+    }
+    this.chapterEnding.style.transition = 'unset';
+    if (bool) {
+      this.chapterEnding.style.transform = `translateX(${left ? -200 : 0}vw)`;
+      requestAnimationFrame(() => {
+        if (!instant) this.chapterEnding.style.transition = '200ms';
+        this.chapterEnding.style.transform = 'translateX(-100vw)';
+      });
+      this.chapterEndingVisible.val = true;
+    } else {
+      if (!instant) this.chapterEnding.style.transition = '200ms';
+      this.chapterEnding.style.transform = `translateX(${left ? -200 : 0}vw)`;
+      this.chapterEndingVisible.val = false;
+    }
+  };
 
   this.movePage = destPage => {
-    destPage = parseInt(destPage);
+    if (this.chapterEndingVisible.val) {
+      if (destPage < 0) {
+        this.showChapterEnding(false);
+        return;
+      }
+      if (destPage < this.totalPages.val) {
+        this.showChapterEnding(false, false, true);
+        return;
+      }
+      if (destPage >= this.totalPages.val) {
+        return reader.post({ type: 'next' });
+      }
+    }
+    destPage = parseInt(destPage, 10);
     if (destPage < 0) {
-      return reader.post({ type: 'prev' });
+      document.getElementsByClassName('transition-chapter')[0].innerText =
+        reader.prevChapter.name;
+      this.showChapterEnding(true, false, true);
+      setTimeout(() => {
+        reader.post({ type: 'prev' });
+      }, 200);
+      return;
     }
     if (destPage >= this.totalPages.val) {
-      return reader.post({ type: 'next' });
+      document.getElementsByClassName('transition-chapter')[0].innerText =
+        reader.nextChapter.name;
+      this.showChapterEnding(true);
+      setTimeout(() => {
+        reader.post({ type: 'next' });
+      }, 200);
+      return;
     }
     this.page.val = destPage;
     reader.chapterElement.style.transform =
       'translateX(-' + destPage * 100 + '%)';
+
+    const newProgress = parseInt(
+      ((pageReader.page.val + 1) / pageReader.totalPages.val) * 100,
+      10,
+    );
+
+    if (newProgress > reader.chapter.progress) {
+      reader.post({
+        type: 'save',
+        data: parseInt(
+          ((pageReader.page.val + 1) / pageReader.totalPages.val) * 100,
+          10,
+        ),
+      });
+    }
   };
 
   van.derive(() => {
@@ -294,6 +575,7 @@ window.pageReader = new (function () {
         this.totalPages.val = parseInt(
           (reader.chapterWidth + reader.readerSettings.val.padding * 2) /
             reader.layoutWidth,
+          10,
         );
         this.movePage(this.totalPages.val * ratio);
       }, 100);
@@ -313,30 +595,54 @@ window.pageReader = new (function () {
   });
 })();
 
-window.addEventListener('DOMContentLoaded', async () => {
-  // wait for content is rendered
-  setTimeout(() => {
-    reader.refresh();
-    if (reader.generalSettings.val.pageReader) {
-      pageReader.totalPages.val = parseInt(
-        (reader.chapterWidth + reader.readerSettings.val.padding * 2) /
-          reader.layoutWidth,
-      );
-      pageReader.movePage(
-        parseInt(
-          pageReader.totalPages.val *
-            Math.min(0.99, reader.chapter.progress / 100),
-        ),
-      );
-    } else {
-      window.scrollTo({
-        top:
-          (reader.chapterHeight * reader.chapter.progress) / 100 -
-          reader.layoutHeight,
-        behavior: 'smooth',
-      });
-    }
-  }, 100);
+document.addEventListener('DOMContentLoaded', () => {
+  if (pageReader.chapterEndingVisible.val) {
+    pageReader.showChapterEnding(true, true);
+  }
+});
+
+function calculatePages() {
+  reader.refresh();
+
+  if (reader.generalSettings.val.pageReader) {
+    pageReader.totalPages.val = parseInt(
+      (reader.chapterWidth + reader.readerSettings.val.padding * 2) /
+        reader.layoutWidth,
+      10,
+    );
+
+    if (initialPageReaderConfig.nextChapterScreenVisible) return;
+
+    pageReader.movePage(
+      Math.max(
+        0,
+        Math.round(
+          (pageReader.totalPages.val * reader.chapter.progress) / 100,
+        ) - 1,
+      ),
+    );
+  } else {
+    window.scrollTo({
+      top:
+        (reader.chapterHeight * reader.chapter.progress) / 100 -
+        reader.layoutHeight,
+      behavior: 'smooth',
+    });
+  }
+}
+
+const ro = new ResizeObserver(() => {
+  if (pageReader.totalPages.val) {
+    calculatePages();
+  }
+});
+ro.observe(reader.chapterElement);
+
+// Also call once on load
+window.addEventListener('load', () => {
+  document.fonts.ready.then(() => {
+    requestAnimationFrame(() => setTimeout(calculatePages, 0));
+  });
 });
 
 // click handler
@@ -365,6 +671,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       x: clientX / reader.layoutWidth,
       y: clientY / reader.layoutHeight,
     };
+
     if (reader.generalSettings.val.pageReader) {
       const position = detectTapPosition(x, y, true);
       if (position === 'left') {
@@ -468,9 +775,17 @@ window.addEventListener('DOMContentLoaded', async () => {
         .replace(/(?:&nbsp;\s*|[\u200b]\s*)+(?=<\/?p[> ])/g, '')
         .replace(/<br>\s*<br>\s*(?:<br>\s*)+/g, '<br><br>') //force max 2 consecutive <br>, chaining regex
         .replace(
-          /<br>\s*<br>(?:(?!\s*<(?:em|[iab]|strong|span)[> ])|(?<!(?:\/em|\/[iab]|\/strong|\/span)>\s*<br>\s*<br>))\s*/g,
-          '',
-        ) //look-around double br. If certain tags aren't near, delete the double br.
+          /<br>\s*<br>[^]+/,
+          _ =>
+            `${
+              /\/p>/.test(_)
+                ? _.replace(
+                    /<br>\s*<br>(?:(?=\s*<\/?p[> ])|(?<=<\/?p\b[^>]*><br>\s*<br>))\s*/g,
+                    '',
+                  )
+                : _
+            }`,
+        ) //if p found, delete all double br near p
         .replace(/<br>(?:(?=\s*<\/?p[> ])|(?<=<\/?p>\s*<br>))\s*/g, '');
     }
     reader.chapterElement.innerHTML = html;

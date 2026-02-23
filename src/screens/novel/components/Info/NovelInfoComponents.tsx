@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { memo, useCallback, useMemo, useState } from 'react';
 import {
   FlatList,
   StyleSheet,
@@ -43,27 +43,31 @@ const NovelInfoContainer = ({ children }: { children: React.ReactNode }) => (
   <View style={styles.novelInfoContainer}>{children}</View>
 );
 
-const CoverImage = ({
-  children,
-  source,
-  theme,
-  hideBackdrop,
-}: CoverImageProps) => {
-  if (hideBackdrop) {
-    return <View>{children}</View>;
-  } else {
+const CoverImage = memo(
+  ({ children, source, theme, hideBackdrop }: CoverImageProps) => {
+    const overlayBg = useMemo(
+      () => color(theme.background).alpha(0.7).string(),
+      [theme.background],
+    );
+    const overlayStyle = useMemo(
+      () => [{ backgroundColor: overlayBg }, styles.flex1],
+      [overlayBg],
+    );
+    const gradientColors = useMemo(
+      () => ['rgba(0,0,0,0)', theme.background] as const,
+      [theme.background],
+    );
+
+    if (hideBackdrop) {
+      return <View>{children}</View>;
+    }
     return (
       <ImageBackground source={source} style={styles.coverImage}>
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: color(theme.background).alpha(0.7).string(),
-          }}
-        >
+        <View style={overlayStyle}>
           {source.uri ? (
             <LinearGradient
-              colors={['rgba(0,0,0,0)', theme.background]}
-              locations={[0, 1]}
+              colors={gradientColors}
+              locations={GRADIENT_LOCATIONS}
               style={styles.linearGradient}
             >
               {children}
@@ -74,8 +78,10 @@ const CoverImage = ({
         </View>
       </ImageBackground>
     );
-  }
-};
+  },
+);
+
+const GRADIENT_LOCATIONS = [0, 1] as const;
 
 const NovelThumbnail = ({
   source,
@@ -97,44 +103,29 @@ const NovelThumbnail = ({
         <Portal>
           <IconButton
             icon="content-save"
-            style={{
-              position: 'absolute',
-              top: top + 6,
-              right: right + 6,
-              zIndex: 10,
-            }}
+            style={[
+              styles.absoluteIcon,
+              styles.zIndex,
+              { top: top + 6, right: right + 6 },
+            ]}
             iconColor={theme.onBackground}
             onPress={saveNovelCover}
           />
           <IconButton
             icon="pencil-outline"
-            style={{
-              position: 'absolute',
-              top: top + 6,
-              right: right + 60,
-              zIndex: 10,
-            }}
+            style={[
+              styles.absoluteIcon,
+              styles.zIndex,
+              { top: top + 6, right: right + 60 },
+            ]}
             iconColor={theme.onBackground}
             onPress={setCustomNovelCover}
           />
           <Pressable
-            style={{
-              position: 'absolute',
-              width: '100%',
-              height: '100%',
-              flex: 1,
-              justifyContent: 'center',
-              backgroundColor: 'rgba(0,0,0,0.7)',
-            }}
+            style={[styles.expandedOverlay]}
             onPress={() => setExpanded(false)}
           >
-            <Image
-              source={source}
-              resizeMode="contain"
-              style={{
-                flex: 1,
-              }}
-            />
+            <Image source={source} resizeMode="contain" style={styles.flex1} />
           </Pressable>
         </Portal>
       )}
@@ -151,7 +142,7 @@ const NovelTitle = ({
   <Text
     onLongPress={onLongPress}
     onPress={onPress}
-    style={[styles.novelTitle, { color: theme.onBackground }]}
+    style={[{ color: theme.onBackground }, styles.novelTitle]}
     numberOfLines={4}
   >
     {children}
@@ -166,7 +157,7 @@ const NovelInfo = ({
   children: React.ReactNode;
 }) => (
   <Text
-    style={[styles.novelInfo, { color: theme.onSurfaceVariant }]}
+    style={[{ color: theme.onSurfaceVariant }, styles.novelInfo]}
     numberOfLines={1}
   >
     {children}
@@ -182,30 +173,26 @@ const FollowButton = ({
   onPress: () => void;
   followed: boolean;
 }) => (
-  <View style={{ borderRadius: 4, overflow: 'hidden', flex: 1 }}>
+  <View style={styles.followButtonContainer}>
     <Pressable
       android_ripple={{
-        color: color(theme.primary).alpha(0.12).string(),
+        color: theme.rippleColor,
         borderless: false,
       }}
       onPress={onPress}
-      style={{
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingBottom: 8,
-      }}
+      style={styles.followButtonPressable}
     >
       <IconButton
         icon={followed ? 'heart' : 'heart-outline'}
         iconColor={followed ? theme.primary : theme.outline}
         size={24}
-        style={{ margin: 0 }}
+        style={styles.iconButton}
       />
       <Text
-        style={{
-          fontSize: 12,
-          color: followed ? theme.primary : theme.outline,
-        }}
+        style={[
+          { color: followed ? theme.primary : theme.outline },
+          styles.followButtonText,
+        ]}
       >
         {followed
           ? getString('novelScreen.inLibaray')
@@ -224,30 +211,26 @@ const TrackerButton = ({
   onPress: () => void;
   isTracked: boolean;
 }) => (
-  <View style={{ borderRadius: 4, overflow: 'hidden', flex: 1 }}>
+  <View style={styles.followButtonContainer}>
     <Pressable
       android_ripple={{
         color: theme.rippleColor,
         borderless: false,
       }}
       onPress={onPress}
-      style={{
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingBottom: 8,
-      }}
+      style={styles.followButtonPressable}
     >
       <IconButton
         icon={isTracked ? 'check' : 'sync'}
         iconColor={isTracked ? theme.primary : theme.outline}
         size={24}
-        style={{ margin: 0 }}
+        style={styles.iconButton}
       />
       <Text
-        style={{
-          fontSize: 12,
-          color: isTracked ? theme.primary : theme.outline,
-        }}
+        style={[
+          { color: isTracked ? theme.primary : theme.outline },
+          styles.followButtonText,
+        ]}
       >
         {isTracked
           ? getString('novelScreen.tracked')
@@ -257,26 +240,28 @@ const TrackerButton = ({
   </View>
 );
 
-const NovelGenres = ({
-  theme,
-  genres,
-}: {
-  theme: ThemeColors;
-  genres: string;
-}) => {
-  const data = genres.split(/,\s*/);
+const genreKeyExtractor = (_item: string, index: number) => 'genre' + index;
 
-  return (
-    <FlatList
-      contentContainerStyle={styles.genreContainer}
-      horizontal
-      data={data}
-      keyExtractor={(item, index) => 'genre' + index}
-      renderItem={({ item }) => <Chip label={item} theme={theme} />}
-      showsHorizontalScrollIndicator={false}
-    />
-  );
-};
+const NovelGenres = memo(
+  ({ theme, genres }: { theme: ThemeColors; genres: string }) => {
+    const data = useMemo(() => genres.split(/,\s*/), [genres]);
+    const renderGenre = useCallback(
+      ({ item }: { item: string }) => <Chip label={item} theme={theme} />,
+      [theme],
+    );
+
+    return (
+      <FlatList
+        contentContainerStyle={styles.genreContainer}
+        horizontal
+        data={data}
+        keyExtractor={genreKeyExtractor}
+        renderItem={renderGenre}
+        showsHorizontalScrollIndicator={false}
+      />
+    );
+  },
+);
 
 export {
   NovelInfoContainer,
@@ -290,15 +275,36 @@ export {
 };
 
 const styles = StyleSheet.create({
+  flex1: {
+    flex: 1,
+  },
   coverImage: {},
-  followButton: {
-    alignItems: 'center',
-    borderWidth: 0,
-    elevation: 0,
-    height: 32,
+  absoluteIcon: {
+    position: 'absolute',
+  },
+  expandedOverlay: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    flex: 1,
     justifyContent: 'center',
-    marginLeft: 16,
-    paddingLeft: 4,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+  },
+  followButtonContainer: {
+    borderRadius: 4,
+    overflow: 'hidden',
+    flex: 1,
+  },
+  followButtonPressable: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingBottom: 8,
+  },
+  followButtonText: {
+    fontSize: 12,
+  },
+  iconButton: {
+    margin: 0,
   },
   genreChip: {
     borderRadius: 50,
@@ -319,7 +325,6 @@ const styles = StyleSheet.create({
   },
   novelInfo: {
     fontSize: 14,
-    marginBottom: 4,
   },
   novelInfoContainer: {
     flexDirection: 'row',
@@ -342,4 +347,5 @@ const styles = StyleSheet.create({
   novelTitle: {
     fontSize: 20,
   },
+  zIndex: { zIndex: 10 },
 });

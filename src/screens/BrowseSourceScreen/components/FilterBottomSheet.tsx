@@ -8,11 +8,7 @@ import {
 } from 'react-native';
 
 import BottomSheet from '@components/BottomSheet/BottomSheet';
-import {
-  BottomSheetFlatList,
-  BottomSheetModal,
-  BottomSheetView,
-} from '@gorhom/bottom-sheet';
+import { BottomSheetFlatList, BottomSheetModal } from '@gorhom/bottom-sheet';
 
 import { useTheme } from '@hooks/persisted';
 import {
@@ -20,11 +16,11 @@ import {
   FilterToValues,
   Filters,
 } from '@plugins/types/filterTypes';
-import { Button } from '@components/index';
+import { Button, Menu } from '@components/index';
 import { Checkbox } from '@components/Checkbox/Checkbox';
 import MaterialCommunityIcons from '@react-native-vector-icons/material-design-icons';
 import { useBoolean } from '@hooks';
-import { Menu, TextInput, overlay } from 'react-native-paper';
+import { TextInput, overlay } from 'react-native-paper';
 import { getValueFor } from './filterUtils';
 import { getString } from '@strings/translations';
 import { ThemeColors } from '@theme/types';
@@ -70,7 +66,6 @@ const FilterItem: React.FC<FilterItemProps> = ({
           label={
             <Text
               style={[
-                styles.label,
                 {
                   color: theme.onSurface,
                   backgroundColor: overlay(2, theme.surface),
@@ -105,7 +100,7 @@ const FilterItem: React.FC<FilterItemProps> = ({
     return (
       <View style={styles.pickerContainer}>
         <Menu
-          style={styles.flex}
+          fullWidth
           visible={isVisible}
           contentStyle={{ backgroundColor: theme.surfaceVariant }}
           anchor={
@@ -118,7 +113,6 @@ const FilterItem: React.FC<FilterItemProps> = ({
                 label={
                   <Text
                     style={[
-                      styles.label,
                       {
                         color: isVisible ? theme.primary : theme.onSurface,
                         backgroundColor: overlay(2, theme.surface),
@@ -170,7 +164,7 @@ const FilterItem: React.FC<FilterItemProps> = ({
           onPress={toggleCard}
           android_ripple={{ color: theme.rippleColor }}
         >
-          <Text style={[styles.label, { color: theme.onSurfaceVariant }]}>
+          <Text style={[{ color: theme.onSurfaceVariant }]}>
             {filter.label}
           </Text>
           <MaterialCommunityIcons
@@ -250,7 +244,7 @@ const FilterItem: React.FC<FilterItemProps> = ({
           onPress={toggleCard}
           android_ripple={{ color: theme.rippleColor }}
         >
-          <Text style={[styles.label, { color: theme.onSurfaceVariant }]}>
+          <Text style={[{ color: theme.onSurfaceVariant }]}>
             {filter.label}
           </Text>
           <MaterialCommunityIcons
@@ -356,42 +350,66 @@ const FilterBottomSheet: React.FC<BottomSheetProps> = ({
       bottomSheetRef={filterSheetRef}
       snapPoints={[400, 600]}
       bottomInset={bottom}
-      backgroundStyle={styles.transparent}
-      style={[styles.container, { backgroundColor: overlay(2, theme.surface) }]}
-    >
-      <BottomSheetView
-        style={[styles.buttonContainer, { borderBottomColor: theme.outline }]}
-      >
-        <Button
-          title={getString('common.reset')}
-          onPress={() => {
-            setSelectedFilters(filters);
-            clearFilters(filters);
-          }}
-        />
-        <Button
-          title={getString('common.filter')}
-          textColor={theme.onPrimary}
-          onPress={() => {
-            setFilters(selectedFilters);
-            filterSheetRef?.current?.close();
-          }}
-          mode="contained"
-        />
-      </BottomSheetView>
-      <BottomSheetFlatList
-        data={filters && Object.entries(filters)}
-        keyExtractor={item => 'filter' + item[0]}
-        renderItem={({ item }) => (
-          <FilterItem
-            theme={theme}
-            filter={item[1]}
-            filterKey={item[0]}
-            selectedFilters={selectedFilters}
-            setSelectedFilters={setSelectedFilters}
+      handleComponent={null}
+      children={
+        <View style={styles.flex}>
+          <View
+            style={[
+              styles.buttonContainer,
+              { borderBottomColor: theme.outline },
+            ]}
+          >
+            <Button
+              title={getString('common.reset')}
+              onPress={() => {
+                setSelectedFilters(filters);
+                clearFilters(filters);
+              }}
+            />
+            <Button
+              title={getString('common.filter')}
+              textColor={theme.onPrimary}
+              onPress={() => {
+                setFilters(selectedFilters);
+                filterSheetRef?.current?.close();
+              }}
+              mode="contained"
+            />
+          </View>
+          <BottomSheetFlatList
+            data={
+              filters &&
+              (Object.entries(filters) as [string, Filters[string]][])
+            }
+            keyExtractor={(item: [string, Filters[string]]) =>
+              'filter' + item[0]
+            }
+            renderItem={({ item }: { item: [string, Filters[string]] }) => (
+              <FilterItem
+                theme={theme}
+                filter={item[1]}
+                filterKey={item[0]}
+                selectedFilters={selectedFilters}
+                setSelectedFilters={setSelectedFilters}
+              />
+            )}
           />
-        )}
-      />
+        </View>
+      }
+    >
+      {/*<BottomSheetFlatList
+         data={filters && Object.entries(filters)}
+        keyExtractor={(item: [string, unknown]) => 'filter' + item[0]}
+        renderItem={({ item }: { item: [string, Filters[string]] }) => (
+           <FilterItem
+             theme={theme}
+             filter={item[1]}
+            filterKey={item[0] as keyof Filters}
+             selectedFilters={selectedFilters}
+             setSelectedFilters={setSelectedFilters}
+           />
+         )}
+       />*/}
     </BottomSheet>
   );
 };
@@ -424,10 +442,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 8,
     flex: 1,
   },
-  label: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+
   picker: {
     paddingHorizontal: 24,
     width: 200,

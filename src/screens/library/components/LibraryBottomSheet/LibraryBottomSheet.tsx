@@ -31,7 +31,7 @@ import { overlay } from 'react-native-paper';
 import { BottomSheetView } from '@gorhom/bottom-sheet';
 import BottomSheet from '@components/BottomSheet/BottomSheet';
 import { BottomSheetModalMethods } from '@gorhom/bottom-sheet/lib/typescript/types';
-import { FlashList } from '@shopify/flash-list';
+import { LegendList } from '@legendapp/list';
 
 interface LibraryBottomSheetProps {
   bottomSheetRef: RefObject<BottomSheetModalMethods | null>;
@@ -48,10 +48,12 @@ const FirstRoute = () => {
 
   return (
     <View style={styles.flex}>
-      <FlashList
+      <LegendList
+        recycleItems
         estimatedItemSize={4}
         extraData={[filter]}
         data={libraryFilterList}
+        keyExtractor={item => `filter_${item.filter}`}
         renderItem={({ item }) => (
           <Checkbox
             label={item.label}
@@ -79,10 +81,12 @@ const SecondRoute = () => {
 
   return (
     <View style={styles.flex}>
-      <FlashList
+      <LegendList
+        recycleItems
         data={librarySortOrderList}
         extraData={[sortOrder]}
         estimatedItemSize={5}
+        keyExtractor={(item, index) => `sort_${index}_${item.ASC}`}
         renderItem={({ item }) => (
           <SortItem
             label={item.label}
@@ -154,10 +158,12 @@ const ThirdRoute = () => {
       <Text style={[styles.sectionHeader, { color: theme.onSurfaceVariant }]}>
         {getString('libraryScreen.bottomSheet.display.displayMode')}
       </Text>
-      <FlashList
+      <LegendList
+        recycleItems
         estimatedItemSize={4}
         data={displayModesList}
         extraData={[displayMode]}
+        keyExtractor={item => `display_mode_${item.value}`}
         renderItem={({ item }) => (
           <RadioButton
             label={item.label}
@@ -171,6 +177,12 @@ const ThirdRoute = () => {
   );
 };
 
+const bottomSheetSceneMap = SceneMap({
+  first: FirstRoute,
+  second: SecondRoute,
+  third: ThirdRoute,
+});
+
 const LibraryBottomSheet: React.FC<LibraryBottomSheetProps> = ({
   bottomSheetRef,
   style,
@@ -179,24 +191,40 @@ const LibraryBottomSheet: React.FC<LibraryBottomSheetProps> = ({
 
   const layout = useWindowDimensions();
 
-  const renderTabBar = (props: any) => (
-    <TabBar
-      {...props}
-      indicatorStyle={{ backgroundColor: theme.primary }}
-      style={[
-        {
-          backgroundColor: overlay(2, theme.surface),
-          borderBottomColor: color(theme.isDark ? '#FFFFFF' : '#000000')
-            .alpha(0.12)
-            .string(),
-        },
-        styles.tabBar,
-        style,
-      ]}
-      inactiveColor={theme.onSurfaceVariant}
-      activeColor={theme.primary}
-      pressColor={color(theme.primary).alpha(0.12).string()}
-    />
+  const borderBottomColor = useMemo(
+    () =>
+      color(theme.isDark ? '#FFFFFF' : '#000000')
+        .alpha(0.12)
+        .string(),
+    [theme.isDark],
+  );
+
+  const renderTabBar = useCallback(
+    (props: any) => (
+      <TabBar
+        {...props}
+        indicatorStyle={{ backgroundColor: theme.primary }}
+        style={[
+          {
+            backgroundColor: overlay(2, theme.surface),
+            borderBottomColor,
+          },
+          styles.tabBar,
+          style,
+        ]}
+        inactiveColor={theme.onSurfaceVariant}
+        activeColor={theme.primary}
+        pressColor={theme.rippleColor}
+      />
+    ),
+    [
+      theme.primary,
+      theme.surface,
+      theme.onSurfaceVariant,
+      theme.rippleColor,
+      borderBottomColor,
+      style,
+    ],
   );
 
   const [index, setIndex] = useState(0);
@@ -208,12 +236,6 @@ const LibraryBottomSheet: React.FC<LibraryBottomSheetProps> = ({
     ],
     [],
   );
-
-  const renderScene = SceneMap({
-    first: FirstRoute,
-    second: SecondRoute,
-    third: ThirdRoute,
-  });
 
   const renderCommonOptions = useCallback(
     ({ route, color: col }: { route: any; color: string }) => (
@@ -243,7 +265,7 @@ const LibraryBottomSheet: React.FC<LibraryBottomSheetProps> = ({
           commonOptions={commonOptions}
           navigationState={{ index, routes }}
           renderTabBar={renderTabBar}
-          renderScene={renderScene}
+          renderScene={bottomSheetSceneMap}
           onIndexChange={setIndex}
           initialLayout={{ width: layout.width }}
           style={styles.tabView}
@@ -272,6 +294,7 @@ const styles = StyleSheet.create({
   tabView: {
     borderTopLeftRadius: 8,
     borderTopRightRadius: 8,
+    height: 520,
   },
   flex: { flex: 1 },
 });

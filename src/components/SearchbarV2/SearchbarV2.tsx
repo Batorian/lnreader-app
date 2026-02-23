@@ -3,10 +3,10 @@ import { Pressable, StyleSheet, View, TextInput } from 'react-native';
 
 import IconButtonV2 from '../IconButtonV2/IconButtonV2';
 import { ThemeColors } from '../../theme/types';
-import { Menu } from 'react-native-paper';
+import { Menu } from '@components';
 import { MaterialDesignIconName } from '@type/icon';
 
-interface RightIcon {
+export interface RightIcon {
   iconName: MaterialDesignIconName;
   color?: string;
   onPress: () => void;
@@ -49,8 +49,6 @@ const Searchbar: React.FC<SearcbarProps> = ({
   const [extraMenu, showExtraMenu] = useState(false);
 
   const marginTop = 8;
-  const marginRight = 16;
-  const marginLeft = 16;
 
   return (
     <View
@@ -58,8 +56,6 @@ const Searchbar: React.FC<SearcbarProps> = ({
         styles.searchbarContainer,
         {
           marginTop,
-          marginRight,
-          marginLeft,
           backgroundColor: theme.surface2,
         },
       ]}
@@ -86,7 +82,7 @@ const Searchbar: React.FC<SearcbarProps> = ({
           ref={searchbarRef}
           style={[styles.textInput, { color: theme.onSurface }]}
           placeholder={placeholder}
-          placeholderTextColor={theme.onSurface}
+          placeholderTextColor={theme.onSurfaceVariant}
           onChangeText={onChangeText}
           onSubmitEditing={onSubmitEditing}
           defaultValue={searchText}
@@ -112,7 +108,6 @@ const Searchbar: React.FC<SearcbarProps> = ({
           <Menu
             visible={extraMenu}
             onDismiss={() => showExtraMenu(false)}
-            anchorPosition="bottom"
             anchor={
               <IconButtonV2
                 name="dots-vertical"
@@ -135,7 +130,9 @@ const Searchbar: React.FC<SearcbarProps> = ({
                 }}
                 onPress={() => {
                   showExtraMenu(false);
-                  button.onPress();
+                  setTimeout(() => {
+                    button.onPress();
+                  }, 0);
                 }}
               />
             ))}
@@ -163,7 +160,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   searchbarContainer: {
-    borderRadius: 50,
+    borderRadius: 28,
     marginBottom: 12,
     marginHorizontal: 16,
     minHeight: 56,

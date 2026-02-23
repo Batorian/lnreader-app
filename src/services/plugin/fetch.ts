@@ -12,7 +12,7 @@ export const fetchNovel = async (pluginId: string, novelPath: string) => {
 
 export const fetchChapter = async (pluginId: string, chapterPath: string) => {
   const plugin = getPlugin(pluginId);
-  let chapterText = `Unkown plugin: ${pluginId}`;
+  let chapterText = `Unknown plugin: ${pluginId}`;
   if (plugin) {
     chapterText = await plugin.parseChapter(chapterPath);
   }
@@ -34,8 +34,13 @@ export const fetchPage = async (
   page: string,
 ) => {
   const plugin = getPlugin(pluginId);
-  if (!plugin || !plugin.parsePage) {
-    throw new Error('Cant parse page!');
+
+  if (!plugin) {
+    throw new Error(`Unknown plugin: ${pluginId}`);
+  }
+
+  if (!plugin.parsePage) {
+    throw new Error(`Could not fetch chapters for page ${page}`);
   }
   const res = await plugin.parsePage(novelPath, page);
   return res;

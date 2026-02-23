@@ -3,7 +3,7 @@ import { Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image, StyleSheet, View } from 'react-native';
 import { Button } from '@components';
-import PickThemeStep from './PickThemeStep';
+import ThemeSelectionStep from './ThemeSelectionStep';
 import { useState } from 'react';
 import { MMKVStorage } from '@utils/mmkv/mmkv';
 import { getString } from '@strings/translations';
@@ -15,12 +15,13 @@ enum OnboardingStep {
 export default function OnboardingScreen() {
   const theme = useTheme();
   const [step] = useState<OnboardingStep>(OnboardingStep.PICK_THEME);
+
   const renderStep = () => {
     switch (step) {
       case OnboardingStep.PICK_THEME:
-        return <PickThemeStep />;
+        return <ThemeSelectionStep />;
       default:
-        return <PickThemeStep />;
+        return <ThemeSelectionStep />;
     }
   };
   const renderHelptext = () => {
@@ -28,43 +29,30 @@ export default function OnboardingScreen() {
       case OnboardingStep.PICK_THEME:
         return getString('onboardingScreen.pickATheme');
       default:
-        return <PickThemeStep />;
+        return getString('onboardingScreen.pickATheme');
     }
   };
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: theme.background }]}>
+    <SafeAreaView style={[{ backgroundColor: theme.background }, styles.root]}>
       <Image
         source={require('../../../assets/logo.png')}
         tintColor={theme.primary}
-        style={{
-          width: 90,
-          height: 90,
-        }}
+        style={styles.logo}
       />
       <Text
         variant="headlineLarge"
-        style={{
-          fontWeight: '600',
-          paddingBottom: 8,
-          color: theme.onBackground,
-        }}
+        style={[{ color: theme.onBackground }, styles.headline]}
       >
         {getString('onboardingScreen.welcome')}
       </Text>
-      <Text
-        style={{
-          fontWeight: '600',
-          paddingBottom: 8,
-          color: theme.onBackground,
-        }}
-      >
+      <Text style={[{ color: theme.onBackground }, styles.helpText]}>
         {renderHelptext()}
       </Text>
       <View
         style={[
-          styles.stepContainer,
           { backgroundColor: theme.surfaceVariant },
+          styles.stepContainer,
         ]}
       >
         {renderStep()}
@@ -87,6 +75,18 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     paddingHorizontal: 16,
     paddingTop: 40,
+  },
+  logo: {
+    width: 90,
+    height: 90,
+  },
+  headline: {
+    fontWeight: 500,
+    paddingBottom: 8,
+  },
+  helpText: {
+    fontWeight: 500,
+    paddingBottom: 8,
   },
   stepContainer: {
     borderRadius: 8,

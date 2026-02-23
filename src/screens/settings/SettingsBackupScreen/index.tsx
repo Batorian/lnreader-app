@@ -5,12 +5,10 @@ import { useBoolean } from '@hooks';
 import { BackupSettingsScreenProps } from '@navigators/types';
 import GoogleDriveModal from './Components/GoogleDriveModal';
 import SelfHostModal from './Components/SelfHostModal';
-import {
-  createBackup as deprecatedCreateBackup,
-  restoreBackup as deprecatedRestoreBackup,
-} from '@services/backup/legacy';
+import ServiceManager from '@services/ServiceManager';
 import { ScrollView } from 'react-native-gesture-handler';
 import { getString } from '@strings/translations';
+import { StyleSheet } from 'react-native';
 
 const BackupSettings = ({ navigation }: BackupSettingsScreenProps) => {
   const theme = useTheme();
@@ -33,7 +31,7 @@ const BackupSettings = ({ navigation }: BackupSettingsScreenProps) => {
         handleGoBack={() => navigation.goBack()}
         theme={theme}
       />
-      <ScrollView style={{ paddingBottom: 40 }}>
+      <ScrollView style={styles.paddingBottom}>
         <List.Section>
           <List.SubHeader theme={theme}>
             {getString('backupScreen.remoteBackup')}
@@ -52,22 +50,22 @@ const BackupSettings = ({ navigation }: BackupSettingsScreenProps) => {
             onPress={openGoogleDriveModal}
           />
           <List.SubHeader theme={theme}>
-            {getString('backupScreen.legacyBackup')}
+            {getString('backupScreen.localBackup')}
           </List.SubHeader>
           <List.Item
-            title={`${getString('backupScreen.createBackup')} (${getString(
-              'common.deprecated',
-            )})`}
+            title={getString('backupScreen.createBackup')}
             description={getString('backupScreen.createBackupDesc')}
-            onPress={deprecatedCreateBackup}
+            onPress={() => {
+              ServiceManager.manager.addTask({ name: 'LOCAL_BACKUP' });
+            }}
             theme={theme}
           />
           <List.Item
-            title={`${getString('backupScreen.restoreBackup')} (${getString(
-              'common.deprecated',
-            )})`}
+            title={getString('backupScreen.restoreBackup')}
             description={getString('backupScreen.restoreBackupDesc')}
-            onPress={() => deprecatedRestoreBackup()}
+            onPress={() => {
+              ServiceManager.manager.addTask({ name: 'LOCAL_RESTORE' });
+            }}
             theme={theme}
           />
           <List.InfoItem
@@ -95,3 +93,7 @@ const BackupSettings = ({ navigation }: BackupSettingsScreenProps) => {
 };
 
 export default BackupSettings;
+
+const styles = StyleSheet.create({
+  paddingBottom: { paddingBottom: 40 },
+});

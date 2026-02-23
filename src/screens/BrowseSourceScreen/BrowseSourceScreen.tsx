@@ -12,6 +12,7 @@ import { useTheme } from '@hooks/persisted';
 import { useBrowseSource, useSearchSource } from './useBrowseSource';
 
 import { NovelItem } from '@plugins/types';
+import { getPlugin } from '@plugins/pluginManager';
 import { getString } from '@strings/translations';
 import { StyleSheet } from 'react-native';
 import { NovelInfo } from '@database/types';
@@ -23,6 +24,7 @@ import { useLibraryContext } from '@components/Context/LibraryContext';
 const BrowseSourceScreen = ({ route, navigation }: BrowseSourceScreenProps) => {
   const theme = useTheme();
   const { pluginId, pluginName, site, showLatestNovels } = route.params;
+  const imageRequestInit = getPlugin(pluginId)?.imageRequestInit;
 
   const {
     isLoading,
@@ -141,7 +143,8 @@ const BrowseSourceScreen = ({ route, navigation }: BrowseSourceScreenProps) => {
 
                   setInActivity(prev => ({ ...prev, [item.path]: false }));
                 }}
-                selectedNovelIds={[]}
+                hasSelection={false}
+                imageRequestInit={imageRequestInit}
               />
             );
           }}
@@ -166,7 +169,7 @@ const BrowseSourceScreen = ({ route, navigation }: BrowseSourceScreenProps) => {
               {
                 backgroundColor: theme.primary,
                 marginBottom: bottom + 16,
-                marginRight: right + 16,
+                marginEnd: right + 16,
               },
             ]}
             label={getString('common.filter')}
@@ -193,6 +196,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     margin: 16,
     position: 'absolute',
-    right: 0,
+    end: 0,
   },
 });

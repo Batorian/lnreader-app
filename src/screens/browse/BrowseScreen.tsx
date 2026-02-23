@@ -1,6 +1,8 @@
 /* eslint-disable react-native/no-inline-styles */
 import React, { useEffect, useMemo } from 'react';
+import { useWindowDimensions } from 'react-native';
 import { TabView, TabBar } from 'react-native-tab-view';
+import Color from 'color';
 
 import { useSearch } from '@hooks';
 import { usePlugins, useTheme } from '@hooks/persisted';
@@ -8,7 +10,8 @@ import { getString } from '@strings/translations';
 
 import { EmptyView, SafeAreaView, SearchbarV2 } from '@components';
 import { BrowseScreenProps } from '@navigators/types';
-import { AvailableTab, InstalledTab } from './components/BrowseTabs';
+import { AvailableTab } from './components/AvailableTab';
+import { InstalledTab } from './components/InstalledTab';
 
 const routes = [
   { key: 'installedRoute', title: getString('browseScreen.installed') },
@@ -19,6 +22,7 @@ const BrowseScreen = ({ navigation }: BrowseScreenProps) => {
   const theme = useTheme();
   const { searchText, setSearchText, clearSearchbar } = useSearch();
   const { languagesFilter } = usePlugins();
+  const layout = useWindowDimensions();
 
   const searchbarActions = useMemo(
     () =>
@@ -65,6 +69,7 @@ const BrowseScreen = ({ navigation }: BrowseScreenProps) => {
       />
       <TabView
         navigationState={{ index, routes }}
+        initialLayout={{ width: layout.width }}
         renderScene={({ route }) => {
           if (languagesFilter.length === 0) {
             return (
@@ -95,6 +100,11 @@ const BrowseScreen = ({ navigation }: BrowseScreenProps) => {
             indicatorStyle={{ backgroundColor: theme.primary, height: 3 }}
             style={{
               backgroundColor: theme.surface,
+              elevation: 0,
+              borderBottomWidth: 1,
+              borderBottomColor: Color(theme.isDark ? '#FFFFFF' : '#000000')
+                .alpha(0.12)
+                .string(),
             }}
             inactiveColor={theme.secondary}
             activeColor={theme.primary}

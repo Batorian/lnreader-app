@@ -1,4 +1,4 @@
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useCallback } from 'react';
 import {
   Pressable,
   StyleProp,
@@ -33,7 +33,7 @@ const SubHeader = ({
   children: ReactNode;
   theme: ThemeColors;
 }) => (
-  <PaperList.Subheader style={{ color: theme.primary }}>
+  <PaperList.Subheader style={{ color: theme.onSurfaceVariant }}>
     {children}
   </PaperList.Subheader>
 );
@@ -46,48 +46,56 @@ const Item: React.FC<ListItemProps> = ({
   theme,
   disabled,
   right,
-}) => (
-  <PaperList.Item
-    title={title}
-    titleStyle={{ color: disabled ? theme.onSurfaceDisabled : theme.onSurface }}
-    description={description}
-    descriptionStyle={[
-      styles.description,
-      {
-        color: disabled ? theme.onSurfaceDisabled : theme.onSurfaceVariant,
-      },
-    ]}
-    left={
-      icon
-        ? () => (
-            <PaperList.Icon
-              color={theme.primary}
-              icon={icon}
-              style={styles.iconCtn}
-            />
-          )
-        : undefined
+}) => {
+  const left = useCallback(() => {
+    if (icon) {
+      return (
+        <PaperList.Icon
+          color={theme.primary}
+          icon={icon}
+          style={styles.iconCtn}
+        />
+      );
     }
-    right={
-      right
-        ? () => (
-            <PaperList.Icon
-              color={theme.primary}
-              icon={right}
-              style={styles.iconCtn}
-            />
-          )
-        : undefined
+  }, [icon, theme.onSurfaceVariant]);
+  const rightIcon = useCallback(() => {
+    if (right) {
+      return (
+        <PaperList.Icon
+          color={theme.primary}
+          icon={right}
+          style={styles.iconCtn}
+        />
+      );
     }
-    disabled={disabled}
-    onPress={onPress}
-    rippleColor={theme.rippleColor}
-    style={styles.listItemCtn}
-  />
-);
+  }, [right, theme.onSurfaceVariant]);
+  return (
+    <PaperList.Item
+      title={title}
+      titleStyle={{
+        color: disabled ? theme.onSurfaceDisabled : theme.onSurface,
+      }}
+      description={description}
+      descriptionStyle={[
+        styles.description,
+        {
+          color: disabled ? theme.onSurfaceDisabled : theme.onSurfaceVariant,
+        },
+      ]}
+      left={left}
+      right={rightIcon}
+      disabled={disabled}
+      onPress={onPress}
+      rippleColor={theme.rippleColor}
+      style={styles.listItemCtn}
+    />
+  );
+};
 
 const Divider = ({ theme }: { theme: ThemeColors }) => (
-  <PaperDivider style={[styles.divider, { backgroundColor: theme.outline }]} />
+  <PaperDivider
+    style={[styles.divider, { backgroundColor: theme.outlineVariant }]}
+  />
 );
 
 const InfoItem = ({
@@ -103,7 +111,7 @@ const InfoItem = ({
   <View style={[styles.infoCtn, style]}>
     <MaterialIcon
       size={20}
-      color={theme.onSurfaceVariant}
+      color={theme.primary}
       name={'information-outline'}
     />
     <Text style={[styles.infoMsg, { color: theme.onSurfaceVariant }]}>
@@ -113,7 +121,7 @@ const InfoItem = ({
 );
 
 const Icon = ({ icon, theme }: { icon: string; theme: ThemeColors }) => (
-  <PaperList.Icon color={theme.primary} icon={icon} style={{ margin: 0 }} />
+  <PaperList.Icon color={theme.primary} icon={icon} style={styles.margin0} />
 );
 
 interface ColorItemProps {
@@ -125,27 +133,23 @@ interface ColorItemProps {
 
 const ColorItem = ({ title, description, theme, onPress }: ColorItemProps) => (
   <Pressable
-    style={{
-      padding: 16,
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-    }}
+    style={styles.pressable}
     android_ripple={{ color: theme.rippleColor }}
     onPress={onPress}
   >
     <View>
-      <Text style={{ color: theme.onSurface, fontSize: 16 }}>{title}</Text>
+      <Text style={[{ color: theme.onSurface }, styles.fontSize16]}>
+        {title}
+      </Text>
       <Text style={{ color: theme.onSurfaceVariant }}>{description}</Text>
     </View>
     <View
-      style={{
-        backgroundColor: description,
-        height: 24,
-        width: 24,
-        borderRadius: 50,
-        marginRight: 16,
-      }}
+      style={[
+        {
+          backgroundColor: description,
+        },
+        styles.descriptionView,
+      ]}
     />
   </Pressable>
 );
@@ -161,16 +165,25 @@ export default {
 };
 
 const styles = StyleSheet.create({
+  margin0: { margin: 0 },
+  fontSize16: {
+    fontSize: 16,
+  },
+  descriptionView: {
+    height: 24,
+    width: 24,
+    borderRadius: 50,
+    marginEnd: 16,
+  },
   description: {
-    fontSize: 12,
+    fontSize: 14,
     lineHeight: 20,
   },
   divider: {
     height: 1,
-    opacity: 0.5,
   },
   iconCtn: {
-    paddingLeft: 16,
+    paddingStart: 16,
   },
   infoCtn: {
     paddingHorizontal: 16,
@@ -186,5 +199,11 @@ const styles = StyleSheet.create({
   listSection: {
     flex: 1,
     marginVertical: 0,
+  },
+  pressable: {
+    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
 });

@@ -15,8 +15,8 @@ import { ThemeColors } from '@theme/types';
 import renderListChapter from './RenderListChapter';
 import { useChapterContext } from '@screens/reader/ChapterContext';
 import { useNovelContext } from '@screens/novel/NovelContext';
-import { FlashList, ViewToken } from '@shopify/flash-list';
-import { ChapterInfo } from '@database/types';
+import { LegendList, LegendListRef, ViewToken } from '@legendapp/list';
+import { noop } from 'lodash-es';
 
 type ButtonProperties = {
   text: string;
@@ -29,17 +29,26 @@ type ButtonsProperties = {
 };
 
 const ChapterDrawer = () => {
-  const { chapter, setChapter, setLoading } = useChapterContext();
-  const { chapters, novelSettings, pages, setPageIndex } = useNovelContext();
+  const { chapter, getChapter, setLoading } = useChapterContext();
+  const {
+    chapters,
+    novelSettings,
+    pages,
+    fetching,
+    batchInformation,
+    getNextChapterBatch,
+    setPageIndex,
+  } = useNovelContext();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { defaultChapterSort } = useAppSettings();
-  const listRef = useRef<FlashList<ChapterInfo> | null>(null);
+  const listRef = useRef<LegendListRef | null>(null);
+  // ChapterInfo is used via the hooks
 
   const styles = createStylesheet(theme, insets);
 
   const { sort = defaultChapterSort } = novelSettings;
-  const listAscending = sort === 'ORDER BY position ASC';
+  const listAscending = sort.endsWith('Asc');
 
   const defaultButtonLayout: ButtonsProperties = useMemo(
     () => ({
@@ -56,7 +65,7 @@ const ChapterDrawer = () => {
   );
 
   useEffect(() => {
-    let pageIndex = pages.indexOf(chapter.page);
+    let pageIndex = pages.indexOf(chapter.page ?? '');
     if (pageIndex === -1) {
       pageIndex = 0;
     }
@@ -89,9 +98,9 @@ const ChapterDrawer = () => {
       const newBtnLayout = Object.create(defaultButtonLayout);
 
       if (viewableItems.length === 0) return;
-      const cKey = (scrollToIndex.current ?? 0) + 2;
-      const vKey = parseInt(viewableItems[0].key, 10);
-      const visible = vKey <= cKey && cKey <= vKey + viewableItems.length - 1;
+      const visible = viewableItems
+        .map(v => v.index)
+        .includes((scrollToIndex.current ?? 0) + 2);
 
       if (!visible && scrollToIndex.current !== undefined) {
         if (
@@ -110,12 +119,7 @@ const ChapterDrawer = () => {
           };
         }
       }
-      if (cKey <= 2 && vKey <= 4) {
-        newBtnLayout.up = {
-          text: curChapter,
-          index: scrollToIndex.current,
-        };
-      }
+
       setButtonProperties(newBtnLayout);
     },
     [defaultButtonLayout, listAscending],
@@ -136,7 +140,10 @@ const ChapterDrawer = () => {
   useEffect(() => {
     const next = calculateScrollToIndex();
     if (next !== undefined) {
-      if (scrollToIndex.current === undefined) {
+      if (
+        scrollToIndex.current === undefined ||
+        next !== scrollToIndex.current
+      ) {
         scroll(next);
       }
       scrollToIndex.current = next;
@@ -149,16 +156,19 @@ const ChapterDrawer = () => {
       {scrollToIndex === undefined ? (
         <LoadingScreenV2 theme={theme} />
       ) : (
-        <FlashList
+        <LegendList
           ref={listRef}
+          recycleItems
           viewabilityConfig={{
             minimumViewTime: 100,
-            viewAreaCoveragePercentThreshold: 95,
+            itemVisiblePercentThreshold: 90,
           }}
           onViewableItemsChanged={checkViewableItems}
           data={chapters}
           extraData={[chapter, scrollToIndex.current]}
-          keyExtractor={item => (item.position ?? item.id).toString()}
+          keyExtractor={item =>
+            `chapter_${item.id}_${item.position ?? 'no_pos'}`
+          }
           renderItem={val =>
             renderListChapter({
               item: val.item,
@@ -167,12 +177,18 @@ const ChapterDrawer = () => {
               chapterId: chapter.id,
               onPress: () => {
                 setLoading(true);
-                setChapter(val.item);
+                getChapter(val.item);
               },
             })
           }
           estimatedItemSize={60}
           initialScrollIndex={scrollToIndex.current}
+          onEndReached={
+            batchInformation.batch < batchInformation.total && !fetching
+              ? getNextChapterBatch
+              : noop
+          }
+          onEndReachedThreshold={6}
         />
       )}
       <View style={styles.footer}>
@@ -219,8 +235,7 @@ const createStylesheet = (theme: ThemeColors, insets: EdgeInsets) => {
     drawerElementContainer: {
       borderRadius: 50,
       margin: 4,
-      marginLeft: 16,
-      marginRight: 16,
+      marginHorizontal: 16,
       minHeight: 48,
       overflow: 'hidden',
     },
@@ -236,7 +251,7 @@ const createStylesheet = (theme: ThemeColors, insets: EdgeInsets) => {
       borderBottomWidth: 1,
       color: theme.onSurface,
       fontSize: 16,
-      fontWeight: 'bold',
+      fontWeight: '500',
       marginBottom: 4,
       padding: 16,
     },

@@ -1,6 +1,7 @@
 import React, { memo, useCallback, useMemo, useState } from 'react';
 import { getString } from '@strings/translations';
-import { Appbar, Menu as DefaultMenu } from 'react-native-paper';
+import { Appbar } from 'react-native-paper';
+import { Menu as DefaultMenu } from '@components';
 import { ThemeColors } from '@theme/types';
 import Animated, {
   FadeIn,
@@ -11,10 +12,13 @@ import Animated, {
   interpolateColor,
   useAnimatedStyle,
 } from 'react-native-reanimated';
-import EpubIconButton from './EpubIconButton';
-import { ChapterInfo, NovelInfo } from '@database/types';
+import ExportNovelAsEpubButton from './ExportNovelAsEpubButton';
+import { NovelInfo } from '@database/types';
 import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import { MaterialDesignIconName } from '@type/icon';
+
+const AnimatedAppbarAction =
+  Animated.createAnimatedComponent(Appbar.Action);
 
 const Menu = React.memo(
   ({
@@ -30,20 +34,32 @@ const Menu = React.memo(
     theme: ThemeColors;
     items: { label: string; onPress: () => void }[];
   }) => {
+    const contentStyle = useMemo(
+      () => ({ backgroundColor: theme.surface2 }),
+      [theme.surface2],
+    );
+    const itemStyle = useMemo(
+      () => ({ backgroundColor: theme.surface2 }),
+      [theme.surface2],
+    );
+    const titleStyle = useMemo(
+      () => ({ color: theme.onSurface }),
+      [theme.onSurface],
+    );
+
     return (
       <DefaultMenu
         visible={visible}
         onDismiss={onDismiss}
         anchor={anchor}
-        anchorPosition="bottom"
-        contentStyle={{ backgroundColor: theme.surface2 }}
+        contentStyle={contentStyle}
       >
         {items.map((item, index) => (
           <DefaultMenu.Item
             key={index + item.label}
             title={item.label}
-            style={{ backgroundColor: theme.surface2 }}
-            titleStyle={{ color: theme.onSurface }}
+            style={itemStyle}
+            titleStyle={titleStyle}
             onPress={() => {
               onDismiss();
               item.onPress();
@@ -57,7 +73,6 @@ const Menu = React.memo(
 
 const NovelAppbar = ({
   novel,
-  chapters,
   theme,
   isLocal,
   downloadChapters,
@@ -71,7 +86,6 @@ const NovelAppbar = ({
   headerOpacity,
 }: {
   novel: NovelInfo | undefined;
-  chapters: ChapterInfo[];
   theme: ThemeColors;
   isLocal: boolean | undefined;
   downloadChapters: (amount: number | 'all' | 'unread') => void;
@@ -98,6 +112,11 @@ const NovelAppbar = ({
   const [downloadMenu, showDownloadMenu] = useState(false);
   const [extraMenu, showExtraMenu] = useState(false);
 
+  const appbarTheme = useMemo(
+    () => ({ colors: theme }),
+    [theme],
+  );
+
   const AppbarAction = useCallback(
     (props: {
       icon: MaterialDesignIconName;
@@ -105,20 +124,19 @@ const NovelAppbar = ({
       style?: StyleProp<ViewStyle>;
       size?: number;
     }) => {
-      const AA = Animated.createAnimatedComponent(Appbar.Action);
       return (
-        <AA
+        <AnimatedAppbarAction
           entering={FadeIn.duration(250)}
-          // delay to prevent flickering on rerenders
           exiting={FadeOut.delay(50).duration(250)}
-          theme={{ colors: theme }}
+          theme={appbarTheme}
           size={24}
           {...props}
         />
       );
     },
-    [theme],
+    [appbarTheme],
   );
+
   const downloadMenuItems = useMemo(() => {
     return [
       {
@@ -152,8 +170,34 @@ const NovelAppbar = ({
     ];
   }, [deleteChapters, downloadChapters, downloadCustomChapterModal]);
 
+  const extraMenuItems = useMemo(
+    () => [
+      {
+        label: getString('novelScreen.edit.info'),
+        onPress: () => showEditInfoModal(true),
+      },
+      {
+        label: getString('novelScreen.edit.cover'),
+        onPress: () => setCustomNovelCover(),
+      },
+    ],
+    [showEditInfoModal, setCustomNovelCover],
+  );
+
   const openDlMenu = useCallback(() => showDownloadMenu(true), []);
   const closeDlMenu = useCallback(() => showDownloadMenu(false), []);
+  const openExtraMenu = useCallback(() => showExtraMenu(true), []);
+  const closeExtraMenu = useCallback(() => showExtraMenu(false), []);
+
+  const openJumpToChapter = useCallback(
+    () => showJumpToChapterModal(true),
+    [showJumpToChapterModal],
+  );
+
+  const headerTheme = useMemo(
+    () => ({ colors: { ...theme, surface: 'transparent' } }),
+    [theme],
+  );
 
   return (
     <Animated.View
@@ -161,32 +205,24 @@ const NovelAppbar = ({
       exiting={SlideOutUp.duration(250)}
       style={headerOpacityStyle}
     >
-      <Appbar.Header theme={{ colors: { ...theme, surface: 'transparent' } }}>
+      <Appbar.Header theme={headerTheme}>
         <Appbar.BackAction onPress={goBack} />
 
         <View style={styles.row}>
-          <EpubIconButton
-            theme={theme}
-            novel={novel}
-            chapters={chapters}
-            anchor={AppbarAction}
-          />
-
+          <ExportNovelAsEpubButton novel={novel} iconComponent={AppbarAction} />
           <AppbarAction icon="share-variant" onPress={shareNovel} />
           <AppbarAction
             icon="text-box-search-outline"
-            onPress={() => {
-              showJumpToChapterModal(true);
-            }}
+            onPress={openJumpToChapter}
           />
-          {!isLocal && (
+          {!isLocal ? (
             <Menu
               theme={theme}
               visible={downloadMenu}
               onDismiss={closeDlMenu}
               anchor={
                 <Appbar.Action
-                  theme={{ colors: theme }}
+                  theme={appbarTheme}
                   icon="download-outline"
                   onPress={openDlMenu}
                   size={26}
@@ -194,33 +230,20 @@ const NovelAppbar = ({
               }
               items={downloadMenuItems}
             />
-          )}
+          ) : null}
           <Menu
             visible={extraMenu}
-            onDismiss={() => showExtraMenu(false)}
+            onDismiss={closeExtraMenu}
             anchor={
               <Appbar.Action
-                theme={{ colors: theme }}
+                theme={appbarTheme}
                 icon="dots-vertical"
-                onPress={() => showExtraMenu(true)}
+                onPress={openExtraMenu}
                 size={24}
               />
             }
             theme={theme}
-            items={[
-              {
-                label: getString('novelScreen.edit.info'),
-                onPress: () => {
-                  showEditInfoModal(true);
-                },
-              },
-              {
-                label: getString('novelScreen.edit.cover'),
-                onPress: () => {
-                  setCustomNovelCover();
-                },
-              },
-            ]}
+            items={extraMenuItems}
           />
         </View>
       </Appbar.Header>
@@ -232,7 +255,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     position: 'absolute',
-    right: 0,
+    end: 0,
   },
 });
 

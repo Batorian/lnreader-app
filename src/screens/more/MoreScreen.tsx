@@ -86,7 +86,6 @@ const MoreScreen = ({ navigation }: MoreStackScreenProps) => {
             <Switch
               value={downloadedOnlyMode}
               onValueChange={enableDownloadedOnlyMode}
-              size={24}
             />
           </Pressable>
           <Pressable
@@ -120,7 +119,6 @@ const MoreScreen = ({ navigation }: MoreStackScreenProps) => {
             <Switch
               value={incognitoMode}
               onValueChange={enableIncognitoMode}
-              size={24}
             />
           </Pressable>
           <List.Divider theme={theme} />

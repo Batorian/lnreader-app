@@ -74,13 +74,21 @@ class NativeFile(context: ReactApplicationContext) :
     }
 
     override fun writeFile(path: String, content: String) {
-        val fw = FileWriter(path)
-        fw.write(content)
-        fw.close()
+        try {
+            val fw = FileWriter(path)
+            fw.write(content)
+            fw.close()
+        } catch (e: IOException) {
+            throw Exception("Failed to write file '$path': ${e.message}")
+        }
     }
 
     override fun readFile(path: String): String {
-        return File(path).bufferedReader().readText()
+        val file = File(path)
+        if (!file.exists()) {
+            throw Exception("File not found: '$path'")
+        }
+        return file.bufferedReader().readText()
     }
 
     override fun copyFile(filepath: String, destPath: String) {
@@ -97,17 +105,27 @@ class NativeFile(context: ReactApplicationContext) :
         destPath: String,
         onDone: (() -> Unit)? = null,
     ) {
-        val inputStream = getInputStream(filepath)
-        val outputStream = getOutputStream(destPath)
-        val buffer = ByteArray(BUFFER_SIZE)
-        var length: Int
-        while (inputStream.read(buffer).also { length = it } > 0) {
-            outputStream.write(buffer, 0, length)
-        }
-        inputStream.close()
-        outputStream.close()
-        if (onDone != null) {
-            onDone()
+        try {
+            val inputStream = getInputStream(filepath)
+            try {
+                val outputStream = getOutputStream(destPath)
+                try {
+                    val buffer = ByteArray(BUFFER_SIZE)
+                    var length: Int
+                    while (inputStream.read(buffer).also { length = it } > 0) {
+                        outputStream.write(buffer, 0, length)
+                    }
+                } finally {
+                    outputStream.close()
+                }
+            } finally {
+                inputStream.close()
+            }
+            if (onDone != null) {
+                onDone()
+            }
+        } catch (e: IOException) {
+            throw Exception("Failed to copy file from '$filepath' to '$destPath': ${e.message}")
         }
     }
 
@@ -155,6 +173,7 @@ class NativeFile(context: ReactApplicationContext) :
         val pb = PushbackInputStream(input, 2)
         val signature = ByteArray(2)
         val len = pb.read(signature)
+        if(len == -1) return pb;
         pb.unread(signature, 0, len)
         return if (signature[0] == 0x1f.toByte() && signature[1] == 0x8b.toByte())
             GZIPInputStream(pb) else pb
@@ -190,18 +209,21 @@ class NativeFile(context: ReactApplicationContext) :
                         }
 
                         override fun onResponse(call: Call, response: Response) {
-                            if (!response.isSuccessful || response.body == null) {
-                                promise.reject(Exception("Failed to download load: ${response.code}"))
-                                return
-                            }
-                            try {
-                                val inputStream = decompressStream(response.body!!.byteStream())
-                                FileOutputStream(destPath).use { fos ->
-                                    inputStream.copyTo(fos, BUFFER_SIZE)
+                            response.use {
+                                if (!it.isSuccessful || it.body == null) {
+                                    promise.reject(Exception("Failed to download: ${it.code}"))
+                                    return
                                 }
-                                promise.resolve(null)
-                            } catch (e: Exception) {
-                                promise.reject(e)
+                                try {
+                                    decompressStream(it.body!!.byteStream()).use { inputStream ->
+                                        FileOutputStream(destPath).use { fos ->
+                                            inputStream.copyTo(fos, BUFFER_SIZE)
+                                        }
+                                    }
+                                    promise.resolve(null)
+                                } catch (e: Exception) {
+                                    promise.reject(e)
+                                }
                             }
                         }
                     })

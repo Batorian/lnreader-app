@@ -9,7 +9,10 @@ const ChapterEnding = () => {
             ? button(
                 {
                   class: 'next-button',
-                  onclick: () => reader.post({ type: 'next' }),
+                  onclick: e => {
+                    e.stopPropagation();
+                    reader.post({ type: 'next' });
+                  },
                 },
                 reader.strings.nextChapter,
               )
@@ -261,6 +264,10 @@ const TTSController = () => {
     {
       id: 'TTS-Controller',
       class: () => `${reader.generalSettings.val.TTSEnable ? '' : 'hidden'}`,
+      style: () =>
+        reader.generalSettings.val.TTSEnable
+          ? 'pointer-events: auto;'
+          : 'pointer-events: none; display: none !important; opacity: 0; transition: none;',
       ontouchstart: () => {
         if (!controllerElement) {
           controllerElement = document.getElementById('TTS-Controller');
@@ -300,7 +307,8 @@ const TTSController = () => {
             top = reader.layoutHeight - 120;
           }
           controllerElement.style.top = `${top}px`;
-          if (hoverElement) {
+          // Check if TTS is still enabled before starting
+          if (hoverElement && reader.generalSettings.val.TTSEnable) {
             tts.start(hoverElement);
             controllerElement.firstElementChild.innerHTML = pauseIcon;
           }
@@ -310,11 +318,18 @@ const TTSController = () => {
       },
       onclick: e => {
         e.stopPropagation();
+        // Don't allow interaction if TTS is disabled
+        if (!reader.generalSettings.val.TTSEnable) {
+          return;
+        }
         if (tts.reading) {
           tts.pause();
           controllerElement.firstElementChild.innerHTML = resumeIcon;
-        } else {
+        } else if (tts.started) {
           tts.resume();
+          controllerElement.firstElementChild.innerHTML = pauseIcon;
+        } else {
+          tts.start();
           controllerElement.firstElementChild.innerHTML = pauseIcon;
         }
       },

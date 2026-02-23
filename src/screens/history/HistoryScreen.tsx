@@ -39,7 +39,7 @@ const HistoryScreen = ({ navigation }: HistoryScreenProps) => {
     setSearchText(text);
     setSearchResults(
       history.filter(item =>
-        item.novelName.toLowerCase().includes(searchText.toLowerCase()),
+        item.novelName.toLowerCase().includes(text.toLowerCase()),
       ),
     );
   };
@@ -47,6 +47,7 @@ const HistoryScreen = ({ navigation }: HistoryScreenProps) => {
   const groupHistoryByDate = (rawHistory: History[]) => {
     const dateGroups = rawHistory.reduce<Record<string, History[]>>(
       (groups, item) => {
+        if (!item.readTime) return groups;
         const date = convertDateToISOString(item.readTime);
 
         if (!groups[date]) {

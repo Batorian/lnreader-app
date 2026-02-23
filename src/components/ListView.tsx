@@ -29,6 +29,7 @@ const ListView = ({
   isSelected,
   onLongPress,
 }: ListViewProps) => {
+  const fadedImage = { opacity: inLibraryBadge ? 0.5 : 1 };
   return (
     <Pressable
       android_ripple={{ color: theme.rippleColor }}
@@ -43,9 +44,9 @@ const ListView = ({
     >
       <Image
         source={{
-          uri: item.cover,
+          uri: item.cover ?? undefined,
         }}
-        style={[styles.extensionIcon, inLibraryBadge ? { opacity: 0.5 } : {}]}
+        style={[styles.extensionIcon, fadedImage]}
       />
       <Text
         style={[{ color: theme.onSurface }, styles.novelName]}
@@ -87,7 +88,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexWrap: 'wrap',
     fontSize: 15,
-    marginLeft: 16,
-    paddingRight: 8,
+    marginStart: 16,
+    paddingEnd: 8,
   },
 });

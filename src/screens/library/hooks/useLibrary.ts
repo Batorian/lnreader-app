@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 
 import { getCategoriesFromDb } from '@database/queries/CategoryQueries';
@@ -9,6 +9,11 @@ import { Category, NovelInfo } from '@database/types';
 import { useLibrarySettings } from '@hooks/persisted';
 import { LibrarySortOrder } from '../constants/constants';
 import { switchNovelToLibraryQuery } from '@database/queries/NovelQueries';
+import ServiceManager, {
+  BackgroundTask,
+  QueuedBackgroundTask,
+} from '@services/ServiceManager';
+import { useMMKVObject } from 'react-native-mmkv';
 
 // type Library = Category & { novels: LibraryNovelInfo[] };
 export type ExtendedCategory = Category & { novelIds: number[] };
@@ -38,14 +43,26 @@ export const useLibrary = (): UseLibraryReturnType => {
   const [searchText, setSearchText] = useState('');
 
   const refreshCategories = useCallback(async () => {
-    const dbCategories = getCategoriesFromDb();
+    const dbCategories = await getCategoriesFromDb();
 
-    const res = dbCategories.map(c => ({
+    const res = dbCategories.map((c, i) => ({
       ...c,
+      sort: c.sort ?? i,
       novelIds: (c.novelIds ?? '').split(',').map(Number),
     }));
 
-    setCategories(res);
+    const filteredCategories = res.filter(cat => {
+      if (cat.id !== 1) {
+        return true;
+      }
+
+      const hasUserCategories = res.length > 2;
+      const hasNovels = cat.novelIds.length > 0 && cat.novelIds[0] !== 0;
+
+      return !hasUserCategories || hasNovels;
+    });
+
+    setCategories(filteredCategories);
   }, []);
 
   const getLibrary = useCallback(async () => {
@@ -62,12 +79,18 @@ export const useLibrary = (): UseLibraryReturnType => {
     setIsLoading(false);
   }, [downloadedOnlyMode, filter, refreshCategories, searchText, sortOrder]);
 
+  const libraryLookup = useMemo(() => {
+    const set = new Set<string>();
+    for (const novel of library) {
+      set.add(`${novel.pluginId}::${novel.path}`);
+    }
+    return set;
+  }, [library]);
+
   const novelInLibrary = useCallback(
     (pluginId: string, novelPath: string) =>
-      library?.some(
-        novel => novel.pluginId === pluginId && novel.path === novelPath,
-      ),
-    [library],
+      libraryLookup.has(`${pluginId}::${novelPath}`),
+    [libraryLookup],
   );
 
   const switchNovelToLibrary = useCallback(
@@ -76,7 +99,8 @@ export const useLibrary = (): UseLibraryReturnType => {
 
       // Important to get correct chapters count
       // Count is set by sql trigger
-      const novels = getLibraryNovelsFromDb(
+      await refreshCategories();
+      const novels = await getLibraryNovelsFromDb(
         sortOrder,
         filter,
         searchText,
@@ -85,12 +109,41 @@ export const useLibrary = (): UseLibraryReturnType => {
 
       setLibrary(novels);
     },
-    [downloadedOnlyMode, filter, searchText, sortOrder],
+    [downloadedOnlyMode, filter, refreshCategories, searchText, sortOrder],
   );
 
   useFocusEffect(() => {
     getLibrary();
   });
+
+  const [taskQueue] = useMMKVObject<
+    Array<BackgroundTask | QueuedBackgroundTask>
+  >(ServiceManager.manager.STORE_KEY);
+  const restoreTasksCount = useMemo(
+    () =>
+      taskQueue?.filter(t => {
+        /**
+         * Handle backward compatibility: check for new format first, then old format
+         */
+        const taskName =
+          (t as QueuedBackgroundTask)?.task?.name ||
+          (t as BackgroundTask)?.name;
+        return (
+          taskName === 'LOCAL_RESTORE' ||
+          taskName === 'DRIVE_RESTORE' ||
+          taskName === 'SELF_HOST_RESTORE'
+        );
+      }).length || 0,
+    [taskQueue],
+  );
+  const prevRestoreTasksCountRef = useRef(restoreTasksCount);
+
+  useEffect(() => {
+    if (prevRestoreTasksCountRef.current > 0 && restoreTasksCount === 0) {
+      getLibrary();
+    }
+    prevRestoreTasksCountRef.current = restoreTasksCount;
+  }, [getLibrary, restoreTasksCount]);
 
   return {
     library,
@@ -110,7 +163,7 @@ export const useLibraryNovels = () => {
   const [library, setLibrary] = useState<NovelInfo[]>([]);
 
   const getLibrary = async () => {
-    const novels = getLibraryNovelsFromDb();
+    const novels = await getLibraryNovelsFromDb();
 
     setLibrary(novels);
   };

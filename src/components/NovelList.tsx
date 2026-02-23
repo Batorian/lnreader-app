@@ -23,6 +23,9 @@ interface NovelListProps extends FlatListProps<NovelInfo | NovelItem> {
   data: Array<listDataItem>;
 }
 
+const novelListKeyExtractor = (item: NovelInfo | NovelItem, index: number) =>
+  index + '_' + item.path;
+
 const NovelList: React.FC<NovelListProps> = props => {
   const { displayMode = DisplayModes.Comfortable, novelsPerRow = 3 } =
     useLibrarySettings();
@@ -74,7 +77,7 @@ const NovelList: React.FC<NovelListProps> = props => {
       ]}
       numColumns={numColumns}
       key={numColumns}
-      keyExtractor={(item, index) => index + '_' + item.path}
+      keyExtractor={novelListKeyExtractor}
       {...props}
       data={extendedNovelList}
     />

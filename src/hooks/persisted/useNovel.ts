@@ -1,9 +1,9 @@
 /* eslint-disable no-console */
-import { SearchResult, UserListEntry } from '@services/Trackers';
 import { useMMKVNumber, useMMKVObject } from 'react-native-mmkv';
-import { TrackerMetadata, getTracker } from './useTracker';
 import { ChapterInfo, NovelInfo } from '@database/types';
 import { MMKVStorage } from '@utils/mmkv/mmkv';
+import { TRACKED_NOVEL_PREFIX } from './useTrackedNovel';
+import { ChapterOrderKey, ChapterFilterKey } from '@database/constants';
 import {
   getNovelByPath,
   deleteCachedNovels as _deleteCachedNovels,
@@ -24,10 +24,12 @@ import {
   getCustomPages,
   getChapterCount,
   getPageChaptersBatched,
+  getFirstUnreadChapter as _getFirstUnreadChapter,
+  updateChapterProgress as _updateChapterProgress,
 } from '@database/queries/ChapterQueries';
 import { fetchNovel, fetchPage } from '@services/plugin/fetch';
 import { showToast } from '@utils/showToast';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getString } from '@strings/translations';
 import dayjs from 'dayjs';
 import { parseChapterNumber } from '@utils/parseChapterNumber';
@@ -38,100 +40,24 @@ import { useLibraryContext } from '@components/Context/LibraryContext';
 
 // #region constants
 
-// store key: '<PREFIX>_<novel.pluginId>_<novel.path>',
-// store key: '<PREFIX>_<novel.id>',
-
-export const TRACKED_NOVEL_PREFIX = 'TRACKED_NOVEL_PREFIX';
-
 export const NOVEL_PAGE_INDEX_PREFIX = 'NOVEL_PAGE_INDEX_PREFIX';
 export const NOVEL_SETTINSG_PREFIX = 'NOVEL_SETTINGS';
 export const LAST_READ_PREFIX = 'LAST_READ_PREFIX';
 
 const defaultNovelSettings: NovelSettings = {
   showChapterTitles: true,
+  filter: [],
 };
 const defaultPageIndex = 0;
 
 // #endregion
 // #region types
 
-type TrackedNovel = SearchResult & UserListEntry;
-
 export interface NovelSettings {
-  sort?: string;
-  filter?: string;
+  sort?: ChapterOrderKey;
+  filter: ChapterFilterKey[];
   showChapterTitles?: boolean;
 }
-
-// #endregion
-// #region definition useTrackedNovel
-
-export const useTrackedNovel = (novelId: number | 'NO_ID') => {
-  const [trackedNovel, setValue] = useMMKVObject<TrackedNovel>(
-    `${TRACKED_NOVEL_PREFIX}_${novelId}`,
-  );
-  if (novelId === 'NO_ID') {
-    return {
-      trackedNovel: undefined,
-      trackNovel: () => {},
-      untrackNovel: () => {},
-      updateTrackedNovel: () => {},
-      updateNovelProgess: () => {},
-    };
-  }
-
-  // #endregion
-  // #region trackNovel functions
-
-  const trackNovel = (tracker: TrackerMetadata, novel: SearchResult) => {
-    getTracker(tracker.name)
-      .getUserListEntry(novel.id, tracker.auth)
-      .then((data: UserListEntry) => {
-        setValue({
-          ...novel,
-          ...data,
-        });
-      });
-  };
-
-  const untrackNovel = () => setValue(undefined);
-
-  const updateTrackedNovel = (
-    tracker: TrackerMetadata,
-    data: Partial<UserListEntry>,
-  ) => {
-    if (!trackedNovel) {
-      return;
-    }
-    return getTracker(tracker.name).updateUserListEntry(
-      trackedNovel.id,
-      data,
-      tracker.auth,
-    );
-  };
-
-  const updateNovelProgess = (
-    tracker: TrackerMetadata,
-    chaptersRead: number,
-  ) => {
-    if (!trackedNovel) {
-      return;
-    }
-    return getTracker(tracker.name).updateUserListEntry(
-      trackedNovel.id,
-      { progress: chaptersRead },
-      tracker.auth,
-    );
-  };
-
-  return {
-    trackedNovel,
-    trackNovel,
-    untrackNovel,
-    updateTrackedNovel,
-    updateNovelProgess,
-  };
-};
 
 // #endregion
 // #region definition useNovel
@@ -143,9 +69,15 @@ export const useNovel = (novelOrPath: string | NovelInfo, pluginId: string) => {
   const [novel, setNovel] = useState<NovelInfo | undefined>(
     typeof novelOrPath === 'object' ? novelOrPath : undefined,
   );
-  const [pages, setPages] = useState<string[]>(
-    novel ? calculatePages(novel) : [],
-  );
+  const [pages, setPages] = useState<string[]>(() => {
+    if (novel && novel.totalPages > 0) {
+      const tmpPages = Array(novel.totalPages)
+        .fill(0)
+        .map((_, idx) => String(idx + 1));
+      return tmpPages.length > 1 ? tmpPages : ['1'];
+    }
+    return [];
+  });
 
   const { defaultChapterSort } = useAppSettings();
 
@@ -159,38 +91,41 @@ export const useNovel = (novelOrPath: string | NovelInfo, pluginId: string) => {
   const [lastRead, setLastRead] = useMMKVObject<ChapterInfo>(
     `${LAST_READ_PREFIX}_${pluginId}_${novelPath}`,
   );
-  const [novelSettings = defaultNovelSettings, setNovelSettings] =
+  const [novelSettings = defaultNovelSettings, _setNovelSettings] =
     useMMKVObject<NovelSettings>(
       `${NOVEL_SETTINSG_PREFIX}_${pluginId}_${novelPath}`,
     );
 
   const [chapters, _setChapters] = useState<ChapterInfo[]>([]);
+  const [firstUnreadChapter, setFirstUnreadChapter] = useState<
+    ChapterInfo | undefined
+  >();
   const [batchInformation, setBatchInformation] = useState<{
     batch: number;
     total: number;
     totalChapters?: number;
-  }>(
-    typeof novelOrPath === 'object'
-      ? {
-          batch: 0,
-          total: 0,
-          totalChapters: getChapterCount(novelOrPath.id, pages[pageIndex]),
-        }
-      : { batch: 0, total: 0 },
+  }>({ batch: 0, total: 0 });
+
+  const settingsSort: ChapterOrderKey =
+    novelSettings.sort || defaultChapterSort;
+  const settingsFilter: ChapterFilterKey[] = useMemo(
+    () => novelSettings.filter ?? [],
+    [novelSettings.filter],
   );
 
-  const settingsSort = novelSettings.sort || defaultChapterSort;
   // #endregion
   // #region setters
 
-  function calculatePages(tmpNovel: NovelInfo) {
+  async function calculatePages(tmpNovel: NovelInfo) {
     let tmpPages: string[];
-    if (tmpNovel.totalPages > 0) {
+    if ((tmpNovel.totalPages ?? 0) > 0) {
       tmpPages = Array(tmpNovel.totalPages)
         .fill(0)
         .map((_, idx) => String(idx + 1));
     } else {
-      tmpPages = getCustomPages(tmpNovel.id).map(c => c.page);
+      tmpPages = (await getCustomPages(tmpNovel.id))
+        .map(c => c.page)
+        .filter((page): page is string => page !== null);
     }
 
     return tmpPages.length > 1 ? tmpPages : ['1'];
@@ -209,8 +144,9 @@ export const useNovel = (novelOrPath: string | NovelInfo, pluginId: string) => {
     (index: number, update: Partial<ChapterInfo>) => {
       if (novel) {
         _setChapters(chs => {
-          chs[index] = { ...chs[index], ...update };
-          return chs;
+          const next = [...chs];
+          next[index] = { ...next[index], ...update };
+          return next;
         });
       }
     },
@@ -260,21 +196,7 @@ export const useNovel = (novelOrPath: string | NovelInfo, pluginId: string) => {
     [transformChapters],
   );
 
-  const sortAndFilterChapters = async (sort?: string, filter?: string) => {
-    if (novel) {
-      setNovelSettings({
-        showChapterTitles: novelSettings?.showChapterTitles,
-        sort,
-        filter,
-      });
-    }
-  };
-
-  const setShowChapterTitles = (v: boolean) => {
-    setNovelSettings({ ...novelSettings, showChapterTitles: v });
-  };
-
-  const followNovel = () => {
+  const followNovel = useCallback(() => {
     switchNovelToLibrary(novelPath, pluginId).then(() => {
       if (novel) {
         setNovel({
@@ -283,48 +205,44 @@ export const useNovel = (novelOrPath: string | NovelInfo, pluginId: string) => {
         });
       }
     });
-  };
+  }, [novel, novelPath, pluginId, switchNovelToLibrary]);
 
   // #endregion
   // #region getters
 
   const getNovel = useCallback(async () => {
-    let tmpNovel = getNovelByPath(novelPath, pluginId);
+    let tmpNovel = await getNovelByPath(novelPath, pluginId);
     if (!tmpNovel) {
       const sourceNovel = await fetchNovel(pluginId, novelPath).catch(() => {
         throw new Error(getString('updatesScreen.unableToGetNovel'));
       });
 
       await insertNovelAndChapters(pluginId, sourceNovel);
-      tmpNovel = getNovelByPath(novelPath, pluginId);
+      tmpNovel = await getNovelByPath(novelPath, pluginId);
 
       if (!tmpNovel) {
         return;
       }
     }
-    setPages(calculatePages(tmpNovel));
+
+    setPages(await calculatePages(tmpNovel));
 
     setNovel(tmpNovel);
   }, [novelPath, pluginId]);
 
   const getChapters = useCallback(async () => {
-    const page = pages[pageIndex];
+    const page = pages[pageIndex] ?? 1;
 
     if (novel && page) {
       let newChapters: ChapterInfo[] = [];
 
-      const config = [
-        novel.id,
-        settingsSort,
-        novelSettings.filter,
-        page,
-      ] as const;
+      const config = [novel.id, settingsSort, settingsFilter, page] as const;
 
-      let chapterCount = getChapterCount(novel.id, page);
+      let chapterCount = await getChapterCount(novel.id, page);
 
       if (chapterCount) {
         try {
-          newChapters = getPageChaptersBatched(...config) || [];
+          newChapters = (await getPageChaptersBatched(...config)) || [];
         } catch (error) {
           console.error('teaser', error);
         }
@@ -341,7 +259,7 @@ export const useNovel = (novelOrPath: string | NovelInfo, pluginId: string) => {
         });
         await insertChapters(novel.id, sourceChapters);
         newChapters = await _getPageChapters(...config);
-        chapterCount = getChapterCount(novel.id, page);
+        chapterCount = await getChapterCount(novel.id, page);
       }
 
       setBatchInformation({
@@ -350,11 +268,18 @@ export const useNovel = (novelOrPath: string | NovelInfo, pluginId: string) => {
         totalChapters: chapterCount,
       });
       setChapters(newChapters);
+
+      const unread = await _getFirstUnreadChapter(
+        novel.id,
+        novelSettings.filter,
+        page,
+      );
+      setFirstUnreadChapter(unread ?? undefined);
     }
   }, [
     novel,
     novelPath,
-    novelSettings.filter,
+    settingsFilter,
     pageIndex,
     pages,
     pluginId,
@@ -362,7 +287,7 @@ export const useNovel = (novelOrPath: string | NovelInfo, pluginId: string) => {
     settingsSort,
   ]);
 
-  const getNextChapterBatch = useCallback(() => {
+  const getNextChapterBatch = useCallback(async () => {
     const page = pages[pageIndex];
     const nextBatch = batchInformation.batch + 1;
     if (novel && page && nextBatch <= batchInformation.total) {
@@ -370,13 +295,13 @@ export const useNovel = (novelOrPath: string | NovelInfo, pluginId: string) => {
 
       try {
         newChapters =
-          getPageChaptersBatched(
+          (await getPageChaptersBatched(
             novel.id,
             settingsSort,
-            novelSettings.filter,
+            settingsFilter,
             page,
             nextBatch,
-          ) || [];
+          )) || [];
       } catch (error) {
         console.error('teaser', error);
       }
@@ -387,125 +312,209 @@ export const useNovel = (novelOrPath: string | NovelInfo, pluginId: string) => {
     batchInformation,
     extendChapters,
     novel,
-    novelSettings.filter,
     pageIndex,
     pages,
+    settingsFilter,
     settingsSort,
   ]);
+
+  const loadUpToBatch = useCallback(
+    async (targetBatch: number) => {
+      const page = pages[pageIndex];
+      if (!novel || !page || targetBatch <= batchInformation.batch) {
+        return;
+      }
+
+      // Load all batches from current + 1 up to targetBatch
+      for (
+        let batch = batchInformation.batch + 1;
+        batch <= targetBatch;
+        batch++
+      ) {
+        if (batch > batchInformation.total) break;
+
+        let newChapters: ChapterInfo[] = [];
+        try {
+          newChapters =
+            (await getPageChaptersBatched(
+              novel.id,
+              settingsSort,
+              novelSettings.filter,
+              page,
+              batch,
+            )) || [];
+        } catch (error) {
+          console.error('Error loading batch', batch, error);
+        }
+
+        setBatchInformation(prev => ({ ...prev, batch }));
+        extendChapters(newChapters);
+      }
+    },
+    [
+      batchInformation,
+      extendChapters,
+      novel,
+      novelSettings.filter,
+      pageIndex,
+      pages,
+      settingsSort,
+    ],
+  );
 
   // #endregion
   // #region Mark chapters
 
-  const bookmarkChapters = (_chapters: ChapterInfo[]) => {
-    _chapters.map(_chapter => {
-      _bookmarkChapter(_chapter.id);
-    });
-    mutateChapters(chs =>
-      chs.map(chapter => {
-        if (_chapters.some(_c => _c.id === chapter.id)) {
-          return {
-            ...chapter,
-            bookmark: !chapter.bookmark,
-          };
-        }
-        return chapter;
-      }),
-    );
-  };
-
-  const markPreviouschaptersRead = (chapterId: number) => {
-    if (novel) {
-      _markPreviuschaptersRead(chapterId, novel.id);
+  const bookmarkChapters = useCallback(
+    (_chapters: ChapterInfo[]) => {
+      _chapters.map(_chapter => {
+        _bookmarkChapter(_chapter.id);
+      });
       mutateChapters(chs =>
-        chs.map(chapter =>
-          chapter.id <= chapterId ? { ...chapter, unread: false } : chapter,
-        ),
+        chs.map(chapter => {
+          if (_chapters.some(_c => _c.id === chapter.id)) {
+            return {
+              ...chapter,
+              bookmark: !chapter.bookmark,
+            };
+          }
+          return chapter;
+        }),
       );
-    }
-  };
+    },
+    [mutateChapters],
+  );
 
-  const markChapterRead = (chapterId: number) => {
-    _markChapterRead(chapterId);
+  const markPreviouschaptersRead = useCallback(
+    (chapterId: number) => {
+      if (novel) {
+        _markPreviuschaptersRead(chapterId, novel.id);
+        mutateChapters(chs =>
+          chs.map(chapter =>
+            chapter.id <= chapterId ? { ...chapter, unread: false } : chapter,
+          ),
+        );
+      }
+    },
+    [mutateChapters, novel],
+  );
 
-    mutateChapters(chs =>
-      chs.map(c => {
-        if (c.id !== chapterId) {
-          return c;
-        }
-        return {
-          ...c,
-          unread: false,
-        };
-      }),
-    );
-  };
+  const markChapterRead = useCallback(
+    (chapterId: number) => {
+      _markChapterRead(chapterId);
 
-  const markChaptersRead = (_chapters: ChapterInfo[]) => {
-    const chapterIds = _chapters.map(chapter => chapter.id);
-    _markChaptersRead(chapterIds);
-
-    mutateChapters(chs =>
-      chs.map(chapter => {
-        if (chapterIds.includes(chapter.id)) {
+      mutateChapters(chs =>
+        chs.map(c => {
+          if (c.id !== chapterId) {
+            return c;
+          }
           return {
-            ...chapter,
+            ...c,
             unread: false,
           };
-        }
-        return chapter;
-      }),
-    );
-  };
-
-  const markPreviousChaptersUnread = (chapterId: number) => {
-    if (novel) {
-      _markPreviousChaptersUnread(chapterId, novel.id);
-      mutateChapters(chs =>
-        chs.map(chapter =>
-          chapter.id <= chapterId ? { ...chapter, unread: true } : chapter,
-        ),
+        }),
       );
-    }
-  };
+    },
+    [mutateChapters],
+  );
 
-  const markChaptersUnread = (_chapters: ChapterInfo[]) => {
-    const chapterIds = _chapters.map(chapter => chapter.id);
-    _markChaptersUnread(chapterIds);
+  const updateChapterProgress = useCallback(
+    (chapterId: number, progress: number) => {
+      _updateChapterProgress(chapterId, Math.min(progress, 100));
 
-    mutateChapters(chs =>
-      chs.map(chapter => {
-        if (chapterIds.includes(chapter.id)) {
+      mutateChapters(chs =>
+        chs.map(c => {
+          if (c.id !== chapterId) {
+            return c;
+          }
           return {
-            ...chapter,
-            unread: true,
+            ...c,
+            progress,
           };
-        }
-        return chapter;
-      }),
-    );
-  };
+        }),
+      );
+    },
+    [mutateChapters],
+  );
+
+  const markChaptersRead = useCallback(
+    (_chapters: ChapterInfo[]) => {
+      const chapterIds = _chapters.map(chapter => chapter.id);
+      _markChaptersRead(chapterIds);
+
+      mutateChapters(chs =>
+        chs.map(chapter => {
+          if (chapterIds.includes(chapter.id)) {
+            return {
+              ...chapter,
+              unread: false,
+            };
+          }
+          return chapter;
+        }),
+      );
+    },
+    [mutateChapters],
+  );
+
+  const markPreviousChaptersUnread = useCallback(
+    (chapterId: number) => {
+      if (novel) {
+        _markPreviousChaptersUnread(chapterId, novel.id);
+        mutateChapters(chs =>
+          chs.map(chapter =>
+            chapter.id <= chapterId ? { ...chapter, unread: true } : chapter,
+          ),
+        );
+      }
+    },
+    [mutateChapters, novel],
+  );
+
+  const markChaptersUnread = useCallback(
+    (_chapters: ChapterInfo[]) => {
+      const chapterIds = _chapters.map(chapter => chapter.id);
+      _markChaptersUnread(chapterIds);
+
+      mutateChapters(chs =>
+        chs.map(chapter => {
+          if (chapterIds.includes(chapter.id)) {
+            return {
+              ...chapter,
+              unread: true,
+            };
+          }
+          return chapter;
+        }),
+      );
+    },
+    [mutateChapters],
+  );
 
   // #endregion
   // #region refresh and delete
 
-  const deleteChapter = (_chapter: ChapterInfo) => {
-    if (novel) {
-      _deleteChapter(novel.pluginId, novel.id, _chapter.id).then(() => {
-        mutateChapters(chs =>
-          chs.map(chapter => {
-            if (chapter.id !== _chapter.id) {
-              return chapter;
-            }
-            return {
-              ...chapter,
-              isDownloaded: false,
-            };
-          }),
-        );
-        showToast(getString('common.deleted', { name: _chapter.name }));
-      });
-    }
-  };
+  const deleteChapter = useCallback(
+    (_chapter: ChapterInfo) => {
+      if (novel) {
+        _deleteChapter(novel.pluginId, novel.id, _chapter.id).then(() => {
+          mutateChapters(chs =>
+            chs.map(chapter => {
+              if (chapter.id !== _chapter.id) {
+                return chapter;
+              }
+              return {
+                ...chapter,
+                isDownloaded: false,
+              };
+            }),
+          );
+          showToast(getString('common.deleted', { name: _chapter.name }));
+        });
+      }
+    },
+    [mutateChapters, novel],
+  );
 
   const deleteChapters = useCallback(
     (_chaters: ChapterInfo[]) => {
@@ -538,7 +547,7 @@ export const useNovel = (novelOrPath: string | NovelInfo, pluginId: string) => {
       _getPageChapters(
         novel.id,
         settingsSort,
-        novelSettings.filter,
+        settingsFilter,
         currentPage,
       ).then(chs => {
         setChapters(chs);
@@ -548,7 +557,7 @@ export const useNovel = (novelOrPath: string | NovelInfo, pluginId: string) => {
     novel?.id,
     fetching,
     settingsSort,
-    novelSettings.filter,
+    settingsFilter,
     currentPage,
     setChapters,
   ]);
@@ -558,6 +567,9 @@ export const useNovel = (novelOrPath: string | NovelInfo, pluginId: string) => {
 
   useEffect(() => {
     if (novel) {
+      if (pages.length === 0) {
+        calculatePages(novel).then(setPages);
+      }
       setLoading(false);
     } else {
       getNovel().finally(() => {
@@ -569,7 +581,10 @@ export const useNovel = (novelOrPath: string | NovelInfo, pluginId: string) => {
   }, [getNovel, novel]);
 
   useEffect(() => {
-    if (novel === undefined) return;
+    if (novel === undefined || pages.length === 0) {
+      return;
+    }
+
     setFetching(true);
     getChapters()
       .catch(e => {
@@ -585,36 +600,71 @@ export const useNovel = (novelOrPath: string | NovelInfo, pluginId: string) => {
 
   // #endregion
 
-  return {
-    loading,
-    fetching,
-    pageIndex,
-    pages,
-    novel,
-    lastRead,
-    chapters,
-    novelSettings,
-    batchInformation,
-    getNextChapterBatch,
-    getNovel,
-    setPageIndex,
-    openPage,
-    setNovel,
-    setLastRead,
-    sortAndFilterChapters,
-    followNovel,
-    bookmarkChapters,
-    markPreviouschaptersRead,
-    markChaptersRead,
-    markPreviousChaptersUnread,
-    markChaptersUnread,
-    setShowChapterTitles,
-    markChapterRead,
-    refreshChapters,
-    updateChapter,
-    deleteChapter,
-    deleteChapters,
-  };
+  return useMemo(
+    () => ({
+      loading,
+      fetching,
+      pageIndex,
+      pages,
+      novel,
+      lastRead,
+      firstUnreadChapter,
+      chapters,
+      novelSettings,
+      batchInformation,
+      getNextChapterBatch,
+      loadUpToBatch,
+      getNovel,
+      setPageIndex,
+      openPage,
+      setNovel,
+      setLastRead,
+
+      followNovel,
+      bookmarkChapters,
+      markPreviouschaptersRead,
+      markChapterRead,
+      markChaptersRead,
+      markPreviousChaptersUnread,
+      markChaptersUnread,
+
+      refreshChapters,
+      updateChapter,
+      updateChapterProgress,
+      deleteChapter,
+      deleteChapters,
+    }),
+    [
+      loading,
+      fetching,
+      pageIndex,
+      pages,
+      novel,
+      lastRead,
+      firstUnreadChapter,
+      chapters,
+      novelSettings,
+      batchInformation,
+      getNextChapterBatch,
+      loadUpToBatch,
+      getNovel,
+      setPageIndex,
+      openPage,
+      setLastRead,
+      followNovel,
+      bookmarkChapters,
+      markPreviouschaptersRead,
+      markChapterRead,
+      markChaptersRead,
+      markPreviousChaptersUnread,
+      markChaptersUnread,
+      refreshChapters,
+      updateChapter,
+      updateChapterProgress,
+      deleteChapter,
+      deleteChapters,
+    ],
+  );
 };
 
 // #region DeleteCachedNovels

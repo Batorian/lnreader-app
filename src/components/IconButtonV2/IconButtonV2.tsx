@@ -41,7 +41,11 @@ const IconButton: React.FC<Props> = ({
       <MaterialCommunityIcons
         name={name}
         size={size}
-        color={disabled ? theme.outline : color || theme.onSurface}
+        color={
+          disabled
+            ? Color(theme.onSurface).alpha(0.38).string()
+            : color || theme.onSurface
+        }
       />
     </Pressable>
   </View>

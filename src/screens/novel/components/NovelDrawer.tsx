@@ -1,4 +1,4 @@
-import { FlashList, ListRenderItem } from '@shopify/flash-list';
+import { LegendList, LegendListRenderItemProps } from '@legendapp/list';
 import { ThemeColors } from '@theme/types';
 import color from 'color';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -20,7 +20,7 @@ export default function NovelDrawer({
   closeDrawer,
 }: NovelDrawerProps) {
   const insets = useSafeAreaInsets();
-  const renderItem: ListRenderItem<string> = ({ item, index }) => (
+  const renderItem = ({ item, index }: LegendListRenderItemProps<string>) => (
     <View
       style={[
         styles.drawerElementContainer,
@@ -58,10 +58,12 @@ export default function NovelDrawer({
       >
         Novel pages
       </Text>
-      <FlashList
+      <LegendList
         data={pages}
+        recycleItems
         extraData={pageIndex}
         renderItem={renderItem}
+        keyExtractor={(item, index) => `novel_page_${index}_${item}`}
         estimatedItemSize={60}
       />
     </View>
@@ -85,7 +87,7 @@ const styles = StyleSheet.create({
   headerCtn: {
     borderBottomWidth: 1,
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: 500,
     marginBottom: 4,
     padding: 16,
   },

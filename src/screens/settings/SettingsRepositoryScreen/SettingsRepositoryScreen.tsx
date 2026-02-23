@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { FlatList, StyleSheet } from 'react-native';
 import { FAB, Portal } from 'react-native-paper';
 
@@ -6,7 +6,6 @@ import { Appbar, EmptyView, SafeAreaView } from '@components';
 
 import {
   createRepository,
-  getRepositoriesFromDb,
   isRepoUrlDuplicated,
   updateRepository,
 } from '@database/queries/RepositoryQueries';
@@ -23,6 +22,9 @@ import {
   RootStackParamList,
 } from '@navigators/types';
 import { showToast } from '@utils/showToast';
+import { useLiveQuery } from '@database/manager/manager';
+import { repositorySchema } from '@database/schema';
+import { dbManager } from '@database/db';
 
 const SettingsBrowseScreen = ({
   route: { params },
@@ -32,12 +34,9 @@ const SettingsBrowseScreen = ({
   const { bottom, right } = useSafeAreaInsets();
   const { refreshPlugins } = usePlugins();
 
-  const [repositories, setRepositories] = useState<Repository[]>(
-    getRepositoriesFromDb(),
-  );
-  const getRepositories = () => {
-    setRepositories(getRepositoriesFromDb());
-  };
+  const repositories = useLiveQuery(dbManager.select().from(repositorySchema), [
+    { table: 'Repository' },
+  ]);
 
   const {
     value: addRepositoryModalVisible,
@@ -45,30 +44,34 @@ const SettingsBrowseScreen = ({
     setFalse: closeAddRepositoryModal,
   } = useBoolean();
 
-  const upsertRepository = (repositoryUrl: string, repository?: Repository) => {
-    if (!new RegExp(/https?:\/\/(.*)plugins\.min\.json/).test(repositoryUrl)) {
-      showToast('Repository URL is invalid');
-      return;
-    }
-
-    if (isRepoUrlDuplicated(repositoryUrl)) {
-      showToast('A respository with this url already exists!');
-    } else {
-      if (repository) {
-        updateRepository(repository.id, repositoryUrl);
-      } else {
-        createRepository(repositoryUrl);
+  const upsertRepository = useCallback(
+    async (repositoryUrl: string, repository?: Repository) => {
+      if (
+        !new RegExp(/https?:\/\/(.*)plugins\.min\.json/).test(repositoryUrl)
+      ) {
+        showToast('Repository URL is invalid');
+        return;
       }
-      getRepositories();
-      refreshPlugins();
-    }
-  };
+
+      if (await isRepoUrlDuplicated(repositoryUrl)) {
+        showToast('A respository with this url already exists!');
+      } else {
+        if (repository) {
+          await updateRepository(repository.id, repositoryUrl);
+        } else {
+          await createRepository(repositoryUrl);
+        }
+        refreshPlugins();
+      }
+    },
+    [refreshPlugins],
+  );
 
   useEffect(() => {
     if (params?.url) {
       upsertRepository(params.url);
     }
-  }, [params]);
+  }, [params, upsertRepository]);
 
   useBackHandler(() => {
     if (!navigation.canGoBack()) {
@@ -97,7 +100,7 @@ const SettingsBrowseScreen = ({
         renderItem={({ item }) => (
           <RepositoryCard
             repository={item}
-            refetchRepositories={getRepositories}
+            refetchRepositories={() => {}}
             upsertRepository={upsertRepository}
           />
         )}

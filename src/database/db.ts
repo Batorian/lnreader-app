@@ -1,146 +1,142 @@
-import * as SQLite from 'expo-sqlite';
+/* eslint-disable no-console */
+import { drizzle } from 'drizzle-orm/op-sqlite';
+
+import { schema } from './schema';
+import { Logger } from 'drizzle-orm';
+
+import { migrate } from 'drizzle-orm/op-sqlite/migrator';
+import migrations from '../../drizzle/migrations';
+import { createDbManager } from './manager/manager';
+import { open } from '@op-engineering/op-sqlite';
+import { createCategoryDefaultQuery } from './queryStrings/populate';
 import {
-  createCategoriesTableQuery,
-  createCategoryDefaultQuery,
   createCategoryTriggerQuery,
-} from './tables/CategoryTable';
-import {
-  createNovelIndexQuery,
-  createNovelTableQuery,
   createNovelTriggerQueryDelete,
   createNovelTriggerQueryInsert,
   createNovelTriggerQueryUpdate,
-  dropNovelIndexQuery,
-} from './tables/NovelTable';
-import { createNovelCategoryTableQuery } from './tables/NovelCategoryTable';
-import {
-  createChapterTableQuery,
-  createChapterIndexQuery,
-  dropChapterIndexQuery,
-} from './tables/ChapterTable';
+} from './queryStrings/triggers';
+import { useEffect, useReducer } from 'react';
 
-import { createRepositoryTableQuery } from './tables/RepositoryTable';
-import { MMKVStorage } from '@utils/mmkv/mmkv';
-import { showToast } from '@utils/showToast';
-
-const dbName = 'lnreader.db';
-
-export const db = SQLite.openDatabaseSync(dbName);
-
-export const createTables = () => {
-  const isOnBoard = MMKVStorage.getBoolean('IS_ONBOARDED');
-
-  // These values are not persistent and need to be set on every app start
-  db.execSync('PRAGMA busy_timeout = 5000');
-  db.execSync('PRAGMA cache_size = 10000');
-  db.execSync('PRAGMA foreign_keys = ON');
-
-  const userVersion =
-    db.getFirstSync<{ user_version: number }>('PRAGMA user_version')
-      ?.user_version ?? 0;
-
-  if (!isOnBoard) {
-    db.execSync('PRAGMA journal_mode = WAL');
-    db.execSync('PRAGMA synchronous = NORMAL');
-    db.execSync('PRAGMA temp_store = MEMORY');
-
-    db.withTransactionSync(() => {
-      db.runSync(createNovelTableQuery);
-      db.runSync(createNovelIndexQuery);
-      db.runSync(createCategoriesTableQuery);
-      db.runSync(createCategoryDefaultQuery);
-      db.runSync(createNovelCategoryTableQuery);
-      db.runSync(createChapterTableQuery);
-      db.runSync(createCategoryTriggerQuery);
-      db.runSync(createChapterIndexQuery);
-      db.runSync(createRepositoryTableQuery);
-      db.runSync(createNovelTriggerQueryInsert);
-      db.runSync(createNovelTriggerQueryUpdate);
-      db.runSync(createNovelTriggerQueryDelete);
-      db.execSync('PRAGMA user_version = 1');
-    });
-  } else {
-    if (userVersion < 1) {
-      updateToDBVersion1();
-    }
+class MyLogger implements Logger {
+  logQuery(_query: string, _params: unknown[]): void {
+    //console.trace('DB Query: ', { query, params });
   }
-};
-
-export const recreateDBIndex = () => {
-  try {
-    db.execSync('PRAGMA analysis_limit=4000');
-    db.execSync('PRAGMA optimize');
-
-    db.execSync('PRAGMA journal_mode = WAL');
-    db.execSync('PRAGMA foreign_keys = ON');
-    db.execSync('PRAGMA synchronous = NORMAL');
-    db.execSync('PRAGMA cache_size = 10000');
-    db.execSync('PRAGMA temp_store = MEMORY');
-    db.execSync('PRAGMA busy_timeout = 5000');
-    db.withTransactionSync(() => {
-      db.runSync(dropNovelIndexQuery);
-      db.runSync(dropChapterIndexQuery);
-      db.runSync(createNovelIndexQuery);
-      db.runSync(createChapterIndexQuery);
-    });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    showToast(message);
-  }
-};
-
-function updateToDBVersion1() {
-  db.execSync('PRAGMA journal_mode = WAL');
-  db.execSync('PRAGMA synchronous = NORMAL');
-  db.execSync('PRAGMA temp_store = MEMORY');
-
-  db.withTransactionSync(() => {
-    db.runSync(
-      'ALTER TABLE Novel ADD COLUMN chaptersDownloaded INTEGER DEFAULT 0',
-    );
-
-    db.runSync('ALTER TABLE Novel ADD COLUMN chaptersUnread INTEGER DEFAULT 0');
-    db.runSync('ALTER TABLE Novel ADD COLUMN totalChapters INTEGER DEFAULT 0');
-    db.runSync('ALTER TABLE Novel ADD COLUMN lastReadAt TEXT');
-    db.runSync('ALTER TABLE Novel ADD COLUMN lastUpdatedAt TEXT');
-    db.runSync(`UPDATE Novel
-      SET chaptersDownloaded = (
-          SELECT COUNT(*)
-          FROM Chapter
-          WHERE Chapter.novelId = Novel.id AND Chapter.isDownloaded = 1
-      );
-      `);
-    db.runSync(`UPDATE Novel
-SET chaptersUnread = (
-    SELECT COUNT(*)
-    FROM Chapter
-    WHERE Chapter.novelId = Novel.id AND Chapter.unread = 1
-);
-`);
-    db.runSync(`UPDATE Novel
-SET totalChapters = (
-    SELECT COUNT(*)
-    FROM Chapter
-    WHERE Chapter.novelId = Novel.id
-);
-`);
-    db.runSync(`UPDATE Novel
-      SET lastReadAt = (
-          SELECT MAX(readTime)
-          FROM Chapter
-          WHERE Chapter.novelId = Novel.id
-      );
-      `);
-    db.runSync(`UPDATE Novel
-      SET lastUpdatedAt = (
-          SELECT MAX(updatedTime)
-          FROM Chapter
-          WHERE Chapter.novelId = Novel.id
-      );
-      `);
-    db.runSync(createNovelTriggerQueryInsert);
-    db.runSync(createNovelTriggerQueryUpdate);
-    db.runSync(createNovelTriggerQueryDelete);
-    db.execSync('PRAGMA user_version = 1');
-  });
 }
+
+const DB_NAME = 'lnreader.db';
+const _db = open({ name: DB_NAME, location: '../files/SQLite' });
+
+/**
+ * Raw SQLite database instance
+ * @deprecated Use `drizzleDb` for new code
+ */
+export const db = _db;
+
+/**
+ * Drizzle ORM database instance with type-safe query builder
+ * Use this for all new database operations
+ */
+export const drizzleDb = drizzle(_db, {
+  schema,
+  logger: __DEV__ ? new MyLogger() : false,
+});
+
+export const dbManager = createDbManager(drizzleDb);
+
+type SqlExecutor = {
+  executeSync: (
+    sql: string,
+    params?: Parameters<typeof _db.executeSync>[1],
+  ) => void;
+};
+
+const setPragmas = (executor: SqlExecutor) => {
+  console.log('Setting database Pragmas');
+  const queries = [
+    'PRAGMA journal_mode = WAL',
+    'PRAGMA synchronous = NORMAL',
+    'PRAGMA temp_store = MEMORY',
+    'PRAGMA busy_timeout = 5000',
+    'PRAGMA cache_size = 10000',
+    'PRAGMA foreign_keys = ON',
+  ];
+  executor.executeSync(queries.join(';\n'));
+};
+const populateDatabase = (executor: SqlExecutor) => {
+  console.log('Populating database');
+  executor.executeSync(createCategoryDefaultQuery);
+};
+
+const createDbTriggers = (executor: SqlExecutor) => {
+  console.log('Creating database triggers');
+  executor.executeSync(createCategoryTriggerQuery);
+  executor.executeSync(createNovelTriggerQueryDelete);
+  executor.executeSync(createNovelTriggerQueryInsert);
+  executor.executeSync(createNovelTriggerQueryUpdate);
+};
+
+export const runDatabaseBootstrap = (executor: SqlExecutor) => {
+  setPragmas(executor);
+  createDbTriggers(executor);
+  populateDatabase(executor);
+};
+
+type InitDbState = {
+  success?: boolean;
+  error?: Error;
+};
+
+export const useInitDatabase = () => {
+  const initialState = {
+    success: false,
+    error: undefined,
+  };
+  const fetchReducer = (
+    state$1: InitDbState,
+    action:
+      | {
+          type: 'migrating' | 'migrated';
+          payload?: boolean | undefined;
+        }
+      | {
+          type: 'error';
+          payload: Error;
+        },
+  ) => {
+    switch (action.type) {
+      case 'migrating':
+        return { ...initialState };
+      case 'migrated':
+        return {
+          ...initialState,
+          success: action.payload,
+        };
+      case 'error':
+        return {
+          ...initialState,
+          error: action.payload,
+        };
+      default:
+        return state$1;
+    }
+  };
+  const [state, dispatch] = useReducer(fetchReducer, initialState);
+  useEffect(() => {
+    dispatch({ type: 'migrating' });
+    migrate(drizzleDb, migrations)
+      .then(() => {
+        runDatabaseBootstrap(_db);
+        dispatch({
+          type: 'migrated',
+          payload: true,
+        });
+      })
+      .catch((error: Error) => {
+        dispatch({
+          type: 'error',
+          payload: error,
+        });
+      });
+  }, []);
+  return state;
+};

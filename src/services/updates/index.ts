@@ -5,7 +5,7 @@ import {
 
 import { showToast } from '../../utils/showToast';
 import { UpdateNovelOptions, updateNovel } from './LibraryUpdateQueries';
-import { LibraryNovelInfo } from '@database/types';
+import { DBNovelInfo } from '@database/types';
 import { sleep } from '@utils/sleep';
 import { MMKVStorage, getMMKVObject } from '@utils/mmkv/mmkv';
 import { LAST_UPDATE_TIME } from '@hooks/persisted/useUpdates';
@@ -36,18 +36,21 @@ const updateLibrary = async (
     refreshNovelMetadata: refreshNovelMetadata || false,
   };
 
-  let libraryNovels: LibraryNovelInfo[] = [];
+  let libraryNovels: DBNovelInfo[] = [];
   if (categoryId) {
-    libraryNovels = getLibraryWithCategory({
-      filter:
-        `categoryId = ${categoryId}` +
-        (onlyUpdateOngoingNovels ? " AND status = 'Ongoing'" : ''),
-    });
+    libraryNovels = await getLibraryWithCategory(
+      categoryId,
+      onlyUpdateOngoingNovels,
+      true,
+    );
   } else {
-    libraryNovels = getLibraryNovelsFromDb(
+    libraryNovels = await getLibraryNovelsFromDb(
       '',
       onlyUpdateOngoingNovels ? "status = 'Ongoing'" : '',
-    ) as LibraryNovelInfo[];
+      '',
+      false,
+      true,
+    );
   }
 
   if (libraryNovels.length > 0) {

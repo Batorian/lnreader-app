@@ -1,92 +1,83 @@
-import { LibraryFilter } from '@screens/library/constants/constants';
-import { LibraryNovelInfo, NovelInfo } from '../types';
-import { getAllSync } from '../utils/helpers';
+import { eq, gt, sql, and, like, or, inArray } from 'drizzle-orm';
+import { dbManager } from '@database/db';
+import { novelSchema, novelCategorySchema } from '@database/schema';
+import { castInt } from '@database/manager/manager';
 
+/**
+ * Get library novels with optional filtering and sorting using Drizzle ORM
+ */
 export const getLibraryNovelsFromDb = (
   sortOrder?: string,
   filter?: string,
   searchText?: string,
   downloadedOnlyMode?: boolean,
-): NovelInfo[] => {
-  let query = 'SELECT * FROM Novel WHERE inLibrary = 1';
-
-  if (filter) {
-    query += ` AND ${filter} `;
-  }
-  if (downloadedOnlyMode) {
-    query += ' ' + LibraryFilter.DownloadedOnly;
-  }
-
-  if (searchText) {
-    query += ' AND name LIKE ? ';
-  }
+  excludeLocalNovels?: boolean,
+) => {
+  const query = dbManager
+    .select()
+    .from(novelSchema)
+    .where(
+      and(
+        eq(novelSchema.inLibrary, true),
+        excludeLocalNovels ? eq(novelSchema.isLocal, false) : undefined,
+        filter ? sql.raw(filter) : undefined,
+        downloadedOnlyMode
+          ? or(
+              gt(novelSchema.chaptersDownloaded, castInt(0)),
+              eq(novelSchema.isLocal, true),
+            )
+          : undefined,
+        searchText ? like(novelSchema.name, `%${searchText}%`) : undefined,
+      ),
+    )
+    .$dynamic();
 
   if (sortOrder) {
-    query += ` ORDER BY ${sortOrder} `;
+    query.orderBy(sql.raw(sortOrder));
   }
-  return getAllSync<NovelInfo>([query, [searchText ?? '']]);
+
+  return query.all();
 };
 
-const getLibraryWithCategoryQuery = 'SELECT * FROM Novel WHERE inLibrary = 1';
-// `
-//   SELECT *
-//   FROM
-//   (
-//     SELECT NIL.*, chaptersUnread, chaptersDownloaded, lastReadAt, lastUpdatedAt
-//     FROM
-//     (
-//       SELECT
-//         Novel.*,
-//         category,
-//         categoryId
-//       FROM
-//       Novel LEFT JOIN (
-//         SELECT NovelId, name as category, categoryId FROM (NovelCategory JOIN Category ON NovelCategory.categoryId = Category.id)
-//       ) as NC ON Novel.id = NC.novelId
-//       WHERE inLibrary = 1
-//     ) as NIL
-//     LEFT JOIN
-//     (
-//       SELECT
-//         SUM(unread) as chaptersUnread, SUM(isDownloaded) as chaptersDownloaded,
-//         novelId, MAX(readTime) as lastReadAt, MAX(updatedTime) as lastUpdatedAt
-//       FROM Chapter
-//       GROUP BY novelId
-//     ) as C ON NIL.id = C.novelId
-//   ) WHERE 1 = 1
-// `;
+/**
+ * Get library novels associated with a specific category using Drizzle ORM
+ */
+export const getLibraryWithCategory = async (
+  categoryId?: number | null,
+  onlyUpdateOngoingNovels?: boolean,
+  excludeLocalNovels?: boolean,
+) => {
+  // First, get novel IDs associated with the specified category
+  const categoryIdQuery = dbManager
+    .selectDistinct({ novelId: novelCategorySchema.novelId })
+    .from(novelCategorySchema)
+    .$dynamic();
 
-export const getLibraryWithCategory = ({
-  filter,
-  searchText,
-  sortOrder,
-  downloadedOnlyMode,
-}: {
-  sortOrder?: string;
-  filter?: string;
-  searchText?: string;
-  downloadedOnlyMode?: boolean;
-}): LibraryNovelInfo[] => {
-  let query = getLibraryWithCategoryQuery;
-  const preparedArgument: (string | number | null)[] = [];
-
-  if (filter) {
-    // query += ` AND ${filter} `;
-  }
-  if (downloadedOnlyMode) {
-    query += ' ' + LibraryFilter.DownloadedOnly;
+  if (categoryId) {
+    categoryIdQuery.where(eq(novelCategorySchema.categoryId, categoryId));
   }
 
-  if (searchText) {
-    query += ' AND name LIKE ? ';
-    preparedArgument.push(`%${searchText}%`);
+  const idRows = await categoryIdQuery.all();
+
+  if (!idRows || idRows.length === 0) {
+    return [];
   }
 
-  if (sortOrder) {
-    query += ` ORDER BY ${sortOrder} `;
-  }
+  const novelIds = idRows.map(r => r.novelId);
 
-  const res = getAllSync<LibraryNovelInfo>([query, preparedArgument]);
+  // Then, fetch the library novels matching those IDs and other criteria
+  const result = dbManager
+    .select()
+    .from(novelSchema)
+    .where(
+      and(
+        eq(novelSchema.inLibrary, true),
+        inArray(novelSchema.id, novelIds),
+        excludeLocalNovels ? eq(novelSchema.isLocal, false) : undefined,
+        onlyUpdateOngoingNovels ? eq(novelSchema.status, 'Ongoing') : undefined,
+      ),
+    )
+    .all();
 
-  return res;
+  return result;
 };

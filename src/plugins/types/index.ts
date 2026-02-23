@@ -1,5 +1,51 @@
 import { FilterToValues, Filters } from './filterTypes';
 
+export interface TextSetting {
+  value: string;
+  label: string;
+  type?: 'Text';
+}
+
+export interface SwitchSetting {
+  value: boolean;
+  label: string;
+  type: 'Switch';
+}
+
+export interface SelectOption {
+  label: string;
+  value: string;
+}
+
+export interface SelectSetting {
+  value: string;
+  label: string;
+  type: 'Select';
+  options: SelectOption[];
+}
+
+export interface CheckboxOption {
+  label: string;
+  value: string;
+}
+
+export interface CheckboxGroupSetting {
+  value: string[];
+  label: string;
+  type: 'CheckboxGroup';
+  options: CheckboxOption[];
+}
+
+export type PluginSetting =
+  | TextSetting
+  | SwitchSetting
+  | SelectSetting
+  | CheckboxGroupSetting;
+
+export interface PluginSettings {
+  [key: string]: PluginSetting;
+}
+
 export interface NovelItem {
   id: undefined;
   name: string;
@@ -62,14 +108,14 @@ export interface PluginItem {
 export interface ImageRequestInit {
   [x: string]: string | Record<string, string> | Headers | FormData | undefined;
   method?: string;
-  headers?: Record<string, string>;
+  headers: Record<string, string>;
   body?: string;
 }
 
 export interface Plugin extends PluginItem {
-  imageRequestInit?: ImageRequestInit;
+  imageRequestInit: ImageRequestInit;
   filters?: Filters;
-  pluginSettings: any;
+  pluginSettings?: PluginSettings;
   popularNovels: (
     pageNo: number,
     options?: PopularNovelsOptions<Filters>,

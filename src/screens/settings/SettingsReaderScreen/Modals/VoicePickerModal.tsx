@@ -5,7 +5,7 @@ import { RadioButton } from '@components/RadioButton/RadioButton';
 
 import { useChapterReaderSettings, useTheme } from '@hooks/persisted';
 import { Voice } from 'expo-speech';
-import { FlashList } from '@shopify/flash-list';
+import { LegendList } from '@legendapp/list';
 import { Modal } from '@components';
 import { StyleSheet } from 'react-native';
 
@@ -32,7 +32,8 @@ const VoicePickerModal: React.FC<VoicePickerModalProps> = ({
         onDismiss={onDismiss}
         contentContainerStyle={[styles.containerStyle]}
       >
-        <FlashList
+        <LegendList
+          recycleItems
           ListHeaderComponent={
             <TextInput
               mode="outlined"
@@ -52,7 +53,7 @@ const VoicePickerModal: React.FC<VoicePickerModalProps> = ({
               placeholder="Search voice"
             />
           }
-          ListHeaderComponentStyle={{ paddingHorizontal: 12 }}
+          ListHeaderComponentStyle={styles.paddingHorizontal}
           data={searchText ? searchedVoices : voices}
           extraData={tts?.voice}
           renderItem={({ item }) => (
@@ -67,13 +68,14 @@ const VoicePickerModal: React.FC<VoicePickerModalProps> = ({
               theme={theme}
             />
           )}
-          keyExtractor={item => item.identifier || 'system'}
+          keyExtractor={(item, index) =>
+            item.identifier || `voice_${index}_${item.name}`
+          }
           estimatedItemSize={64}
-          removeClippedSubviews={true}
           ListEmptyComponent={
             <ActivityIndicator
               size={24}
-              style={{ marginTop: 16 }}
+              style={styles.marginTop}
               color={theme.primary}
             />
           }
@@ -89,4 +91,6 @@ const styles = StyleSheet.create({
   containerStyle: {
     flex: 1,
   },
+  paddingHorizontal: { paddingHorizontal: 12 },
+  marginTop: { marginTop: 16 },
 });

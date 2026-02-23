@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
 
 import * as Linking from 'expo-linking';
 
@@ -37,7 +37,7 @@ const AboutScreen = ({ navigation }: AboutScreenProps) => {
         theme={theme}
         goBack={true}
       />
-      <ScrollView style={{ flex: 1 }}>
+      <ScrollView style={styles.flex}>
         <List.Section>
           <List.Item
             title={getString('aboutScreen.version')}
@@ -51,7 +51,7 @@ const AboutScreen = ({ navigation }: AboutScreenProps) => {
             title={getString('aboutScreen.whatsNew')}
             onPress={() =>
               Linking.openURL(
-                `https://github.com/LNReader/lnreader/releases/tag/v${version}`,
+                `https://github.com/lnreader/lnreader/releases/tag/v${version}`,
               )
             }
             theme={theme}
@@ -59,8 +59,8 @@ const AboutScreen = ({ navigation }: AboutScreenProps) => {
           <List.Divider theme={theme} />
           <List.Item
             title={getString('aboutScreen.website')}
-            description="https://lnreader.github.io"
-            onPress={() => Linking.openURL('https://lnreader.github.io')}
+            description="https://lnreader.app"
+            onPress={() => Linking.openURL('https://lnreader.app')}
             theme={theme}
           />
           <List.Item
@@ -71,17 +71,17 @@ const AboutScreen = ({ navigation }: AboutScreenProps) => {
           />
           <List.Item
             title={getString('aboutScreen.github')}
-            description="https://github.com/LNReader/lnreader"
+            description="https://github.com/lnreader/lnreader"
             onPress={() =>
-              Linking.openURL('https://github.com/LNReader/lnreader')
+              Linking.openURL('https://github.com/lnreader/lnreader')
             }
             theme={theme}
           />
           <List.Item
-            title={getString('aboutScreen.sources')}
-            description="https://github.com/LNReader/lnreader-sources"
+            title={getString('aboutScreen.plugins')}
+            description="https://github.com/lnreader/lnreader-plugins"
             onPress={() =>
-              Linking.openURL('https://github.com/LNReader/lnreader-sources')
+              Linking.openURL('https://github.com/lnreader/lnreader-plugins')
             }
             theme={theme}
           />
@@ -100,3 +100,7 @@ const AboutScreen = ({ navigation }: AboutScreenProps) => {
 };
 
 export default AboutScreen;
+
+const styles = StyleSheet.create({
+  flex: { flex: 1 },
+});

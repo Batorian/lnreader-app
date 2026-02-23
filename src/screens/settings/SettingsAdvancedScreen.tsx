@@ -16,11 +16,10 @@ import {
 
 import { Appbar, Button, List, Modal, SafeAreaView } from '@components';
 import { AdvancedSettingsScreenProps } from '@navigators/types';
-import { StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { getUserAgentSync } from 'react-native-device-info';
 import CookieManager from '@react-native-cookies/cookies';
 import { store } from '@plugins/helpers/storage';
-import { recreateDBIndex } from '@database/db';
 
 const AdvancedSettings = ({ navigation }: AdvancedSettingsScreenProps) => {
   const theme = useTheme();
@@ -55,12 +54,6 @@ const AdvancedSettings = ({ navigation }: AdvancedSettingsScreenProps) => {
     setFalse: hideUserAgentModal,
   } = useBoolean();
 
-  const {
-    value: recreateDBIndexDialog,
-    setTrue: showRecreateDBIndexDialog,
-    setFalse: hideRecreateDBIndexDialog,
-  } = useBoolean();
-
   return (
     <SafeAreaView excludeTop>
       <Appbar
@@ -68,49 +61,45 @@ const AdvancedSettings = ({ navigation }: AdvancedSettingsScreenProps) => {
         handleGoBack={() => navigation.goBack()}
         theme={theme}
       />
-      <List.Section>
-        <List.SubHeader theme={theme}>
-          {getString('advancedSettingsScreen.dataManagement')}
-        </List.SubHeader>
-        <List.Item
-          title={getString('advancedSettingsScreen.clearCachedNovels')}
-          description={getString(
-            'advancedSettingsScreen.clearCachedNovelsDesc',
-          )}
-          onPress={showClearDatabaseDialog}
-          theme={theme}
-        />
-        <List.Item
-          title={getString('advancedSettingsScreen.recreateDBIndexes')}
-          description={getString(
-            'advancedSettingsScreen.recreateDBIndexesDesc',
-          )}
-          onPress={showRecreateDBIndexDialog}
-          theme={theme}
-        />
-        <List.Item
-          title={getString('advancedSettingsScreen.clearUpdatesTab')}
-          description={getString('advancedSettingsScreen.clearupdatesTabDesc')}
-          onPress={showClearUpdatesDialog}
-          theme={theme}
-        />
-        <List.Item
-          title={getString('advancedSettingsScreen.deleteReadChapters')}
-          onPress={showDeleteReadChaptersDialog}
-          theme={theme}
-        />
-        <List.Item
-          title={getString('webview.clearCookies')}
-          onPress={clearCookies}
-          theme={theme}
-        />
-        <List.Item
-          title={getString('advancedSettingsScreen.userAgent')}
-          description={userAgent}
-          onPress={showUserAgentModal}
-          theme={theme}
-        />
-      </List.Section>
+      <ScrollView>
+        <List.Section>
+          <List.SubHeader theme={theme}>
+            {getString('advancedSettingsScreen.dataManagement')}
+          </List.SubHeader>
+          <List.Item
+            title={getString('advancedSettingsScreen.clearCachedNovels')}
+            description={getString(
+              'advancedSettingsScreen.clearCachedNovelsDesc',
+            )}
+            onPress={showClearDatabaseDialog}
+            theme={theme}
+          />
+          <List.Item
+            title={getString('advancedSettingsScreen.clearUpdatesTab')}
+            description={getString(
+              'advancedSettingsScreen.clearupdatesTabDesc',
+            )}
+            onPress={showClearUpdatesDialog}
+            theme={theme}
+          />
+          <List.Item
+            title={getString('advancedSettingsScreen.deleteReadChapters')}
+            onPress={showDeleteReadChaptersDialog}
+            theme={theme}
+          />
+          <List.Item
+            title={getString('webview.clearCookies')}
+            onPress={clearCookies}
+            theme={theme}
+          />
+          <List.Item
+            title={getString('advancedSettingsScreen.userAgent')}
+            description={userAgent}
+            onPress={showUserAgentModal}
+            theme={theme}
+          />
+        </List.Section>
+      </ScrollView>
       <Portal>
         <ConfirmationDialog
           message={getString(
@@ -119,20 +108,6 @@ const AdvancedSettings = ({ navigation }: AdvancedSettingsScreenProps) => {
           visible={deleteReadChaptersDialog}
           onSubmit={deleteReadChaptersFromDb}
           onDismiss={hideDeleteReadChaptersDialog}
-          theme={theme}
-        />
-        <ConfirmationDialog
-          message={getString(
-            'advancedSettingsScreen.recreateDBIndexesDialogTitle',
-          )}
-          visible={recreateDBIndexDialog}
-          onSubmit={() => {
-            recreateDBIndex();
-            showToast(
-              getString('advancedSettingsScreen.recreateDBIndexesToast'),
-            );
-          }}
-          onDismiss={hideRecreateDBIndexDialog}
           theme={theme}
         />
         <ConfirmationDialog

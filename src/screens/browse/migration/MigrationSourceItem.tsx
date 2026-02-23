@@ -29,18 +29,22 @@ const MigrationSourceCard = ({
         <Image source={{ uri: iconUrl }} style={styles.sourceIcon} />
         <View style={styles.sourceDetailsContainer}>
           <Text
-            style={{
-              color: theme.onSurface,
-              fontSize: 14,
-            }}
+            style={[
+              {
+                color: theme.onSurface,
+              },
+              styles.fontSize14,
+            ]}
           >
             {name} {` (${noOfNovels || 0})`}
           </Text>
           <Text
-            style={{
-              color: theme.onSurfaceVariant,
-              fontSize: 12,
-            }}
+            style={[
+              {
+                color: theme.onSurfaceVariant,
+              },
+              styles.fontSize12,
+            ]}
           >
             {lang}
           </Text>
@@ -65,11 +69,13 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginLeft: 16,
+    marginStart: 16,
   },
   sourceIcon: {
     borderRadius: 4,
     height: 40,
     width: 40,
   },
+  fontSize14: { fontSize: 14 },
+  fontSize12: { fontSize: 12 },
 });

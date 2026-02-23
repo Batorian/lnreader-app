@@ -73,10 +73,8 @@ export const Actionbar: React.FC<ActionbarProps> = ({
 const styles = StyleSheet.create({
   actionbarContainer: {
     alignItems: 'center',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
     bottom: 0,
-    elevation: 1,
+    elevation: 0,
     flexDirection: 'row',
     justifyContent: 'space-around',
     position: 'absolute',

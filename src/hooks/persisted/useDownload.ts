@@ -20,6 +20,11 @@ export default function useDownload() {
     [queue],
   ) as { task: DownloadChapterTask; meta: BackgroundTaskMetadata }[];
 
+  const downloadingChapterIds = useMemo(
+    () => new Set(downloadQueue.map(c => c.task.data.chapterId)),
+    [downloadQueue],
+  );
+
   const downloadChapter = (novel: NovelInfo, chapter: ChapterInfo) =>
     ServiceManager.manager.addTask({
       name: 'DOWNLOAD_CHAPTER',
@@ -49,6 +54,7 @@ export default function useDownload() {
 
   return {
     downloadQueue,
+    downloadingChapterIds,
     resumeDowndload,
     downloadChapter,
     downloadChapters,
